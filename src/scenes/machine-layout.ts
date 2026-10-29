@@ -107,7 +107,7 @@ export const K = {
   exec: part("exec", "k", 2.35, -0.95, 1.15, 0.14, 0.5, "exec: ELF loader"),
   drm: part("drm", "k", -3.75, 1.05, 1.2, 0.14, 0.5, "DRM/KMS"),
   route: part("route", "k", 6.2, 0.05, 0.85, 0.12, 0.5, "routing table"),
-  neigh: part("neigh", "k", 6.2, 0.95, 0.85, 0.12, 0.5, "neighbour table"),
+  neigh: part("neigh", "k", 6.2, 0.95, 0.85, 0.12, 0.5, "neighbor table"),
 };
 
 /** The network stack: gates the packet passes through, back (socket) to front (Wi-Fi driver). */
@@ -117,7 +117,7 @@ export const STAGES = [
   { id: "socket", name: "socket", z: -1.75 },
   { id: "icmp", name: "ICMP", z: -0.85 },
   { id: "ip", name: "IP", z: 0.05 },
-  { id: "neigh", name: "neighbour (ARP)", z: 0.95 },
+  { id: "neigh", name: "neighbor (ARP)", z: 0.95 },
   { id: "qdisc", name: "qdisc", z: 1.85 },
   { id: "driver", name: "Wi-Fi driver", z: 2.75 },
 ] as const;

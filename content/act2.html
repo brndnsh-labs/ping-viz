@@ -10,15 +10,21 @@
 <section class="chapter" id="launch" data-chapter="launch">
   <div class="card">
     <h2>claude starts</h2>
-    <p>The key matrix, USB, the interrupt, the PTY, bash, fork and exec all happen exactly as before. The program is different: <code>claude</code> is a single executable of about 290 MB. Claude Code is written in TypeScript and compiled with Bun, which packs a whole JavaScript runtime into the binary next to the app.</p>
+    <p>The key matrix, USB, the interrupt, the PTY, bash, fork and exec all happen exactly as before. The program is different: <code>claude</code> is a single program file of about 290 MB. Claude Code is written in TypeScript (JavaScript with type checking) and compiled with Bun, which packs everything needed to run JavaScript into that one file, next to the app.</p>
   </div>
   <div class="card">
     <h3>Your setup</h3>
-    <p>It reads its settings, then your CLAUDE.md files (instructions you've written for it, for all projects and for this one), any saved memory, and the skills and plugins you've installed. It starts the MCP servers you've configured, small programs that give it more tools, either as child processes it talks to over pipes or as connections to remote servers.</p>
+    <p>It reads its settings, then your CLAUDE.md files (instructions you've written for it, for all projects and for this one), any saved memory, and the skills and plugins you've installed (add-ons that bring extra instructions and tools). It starts the MCP servers you've configured. These are small programs that give it more tools. Some run on your machine and some are servers elsewhere that it connects to.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>A local MCP server is a child process: Claude Code starts it and talks to it over pipes, its standard input and output. A remote one is a connection to a server over the network.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>Raw mode</h3>
-    <p>Then it switches the terminal to raw mode, so every key comes straight through instead of a line at a time, and draws its interface: React components rendered to rows of text instead of a web page (with Ink). You type your prompt and press Enter.</p>
+    <p>Then it switches the terminal to raw mode, so every key comes straight through instead of a line at a time. Then it draws its interface. That's built with React, a library usually used for web pages, and Ink, which draws it as rows of text in the terminal instead. You type your prompt and press Enter.</p>
     <p>The clock starts over here.</p>
   </div>
 </section>
@@ -26,11 +32,11 @@
 <section class="chapter" id="prompt" data-chapter="prompt">
   <div class="card">
     <h2>Assembling the request</h2>
-    <p>The model doesn't remember anything between requests. Every time, Claude Code sends everything it needs to see as one JSON document to the Messages API: which model, a system prompt, the tools it may use, the conversation so far, and settings such as the output limit and <code>"stream": true</code>.</p>
+    <p>The model doesn't remember anything between requests. Every time, Claude Code sends everything it needs to see to the Messages API, the service programs use to talk to Claude. It goes as one JSON document, a plain-text format for labeled data. It names the model and holds a system prompt (Claude Code's standing instructions), the tools the model may use, the conversation so far, and settings such as a cap on the reply's length and <code>"stream": true</code>, which asks for the reply to come back piece by piece.</p>
   </div>
   <div class="card">
     <h3>Before your words</h3>
-    <p>Most of it is there before you type anything. The system prompt explains how Claude Code works and what it can do on your machine. Every built-in tool (running commands, reading and editing files, searching, starting subagents) comes with a description and a JSON Schema for its inputs; your MCP tools go in as names until Claude needs one. Your CLAUDE.md files, saved memory and a few facts about your environment go in too. Together that's typically tens of thousands of tokens.</p>
+    <p>Most of it is there before you type anything. The system prompt explains how Claude Code works and what it can do on your machine. Every built-in tool comes with a description and a JSON Schema, an exact list of the inputs it takes. The tools run commands, read and edit files, search, and start subagents (helpers that take on part of a task in a conversation of their own). Tools from your MCP servers go in as just their names until Claude needs one. Your CLAUDE.md files, saved memory and a few facts about your environment go in too. Together that's typically tens of thousands of tokens.</p>
     <p class="note">A token is the unit the model reads: a short word, a piece of a longer one, punctuation. For Claude, an English token averages about three characters; the exact count depends on the model.</p>
   </div>
   <div class="card">
@@ -39,18 +45,24 @@
   </div>
   <div class="card">
     <h3>Marked for reuse</h3>
-    <p>Most of the request matches one Claude Code sent recently: the same tools, system prompt and project files, and on later turns the whole conversation so far. Claude Code marks where that matching start ends (a cache breakpoint), and the API keeps the work it did on it for 5 minutes, or an hour, which Claude Code asks for on a subscription. The API reads it in a fixed order, tools, then system prompt, then messages, and one changed byte means starting over from there.</p>
+    <p>Most of the request matches one Claude Code sent recently: the same tools, system prompt and project files, and on later turns the whole conversation so far. Claude Code marks where that matching start ends (a cache breakpoint). The API saves the work it did reading everything before the mark, so a later request that starts the same way can skip it. That's prompt caching. The saved work lasts 5 minutes, or an hour, which Claude Code asks for on a subscription. The API reads the request in a fixed order, tools, then system prompt, then messages, and one changed byte means redoing everything after it.</p>
   </div>
 </section>
 
 <section class="chapter" id="wire" data-chapter="wire">
   <div class="card">
     <h2>Over the wire</h2>
-    <p>Act I again, mostly. The name is <code>api.anthropic.com</code> and DNS answers <code>160.79.104.10</code>, an address in a block registered to Anthropic (AS399358) and reached through Cloudflare's network. If Claude Code doesn't have a connection open already, it opens one: a TCP handshake (one round trip), then TLS 1.3 (one more), which agrees on encryption keys and checks the server's certificate.</p>
+    <p>Act I again, mostly. The name is <code>api.anthropic.com</code> and DNS answers <code>160.79.104.10</code>, an address in a block registered to Anthropic (AS399358) and reached through Cloudflare's network. If Claude Code doesn't have a connection open already, it opens one. First comes TCP, the protocol that makes sure every byte arrives, in order. It sets up the connection with a handshake (one round trip). Then TLS 1.3 sets up encryption (one more): the two sides agree on keys, and Claude Code checks the server's certificate, which proves it's really talking to <code>api.anthropic.com</code>.</p>
   </div>
   <div class="card">
     <h3>The request</h3>
-    <p>On a first turn the JSON is around 100 KB. TCP sends it as about 70 segments of up to 1,460 bytes, though not all at once. A new connection starts cautiously, with about 14 KB in the first round trip, and doubles that every round trip while nothing gets lost (slow start). Inside the encryption it's an ordinary HTTPS request: <code>POST /v1/messages</code>.</p>
+    <p>On a first turn the JSON is around 100 KB. TCP cuts it into about 70 pieces of up to 1,460 bytes, each in its own packet, and doesn't send them all at once. A new connection starts cautiously: about 14 KB in the first round trip, then twice as much each round trip after that, as long as nothing gets lost. Inside the encryption it's an ordinary web request: <code>POST /v1/messages</code>.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>TCP calls those pieces segments, and the cautious start is slow start: the first round trip carries ten segments, about 14 KB. The request is HTTPS (HTTP inside TLS), sent over HTTP/2. <code>POST</code> means it carries data to the server, and <code>/v1/messages</code> is the API's address for it.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>Same packets</h3>
@@ -61,26 +73,32 @@
 <section class="chapter" id="frontdoor" data-chapter="frontdoor">
   <div class="card">
     <h2>The front door</h2>
-    <p>The first machines to touch the request are Cloudflare's, at a site near you. They end the encrypted connection and pass the request on toward Anthropic's servers. So far this is the same as many large web services.</p>
+    <p>The first machines to touch the request are Cloudflare's, at a site near you. They're the far end of the encrypted connection: they decrypt the request and pass it on toward Anthropic's servers. So far this is the same as many large web services.</p>
   </div>
   <div class="card">
     <h3>Who's asking</h3>
-    <p>The request carries a credential: an API key, or for a Claude subscription, the OAuth token Claude Code got when you logged in. The API checks it, looks up the limits that apply to you (requests and tokens per minute for an API key, a five-hour and a weekly allowance for a subscription), and keeps count.</p>
+    <p>The request carries proof of who sent it: an API key, which is a long secret string, or for a Claude subscription, a token Claude Code got when you logged in through your browser (with OAuth). The API checks it, looks up the limits that apply to you (requests and tokens per minute for an API key, a five-hour and a weekly allowance for a subscription), and keeps count.</p>
   </div>
   <div class="card">
     <h3>Where to run it</h3>
-    <p>Then the request goes to a deployment of the model you asked for, one with room for it, where it may wait in a short queue. This is where it leaves the part of the internet that looks like Act I.</p>
+    <p>Then the request goes to one of the groups of machines running the model you asked for, one with room for it, where it may wait in a short queue. This is where it leaves the part of the internet that looks like Act I.</p>
   </div>
 </section>
 
 <section class="chapter" id="datacenter" data-chapter="datacenter">
   <div class="card">
     <h2>A building full of chips</h2>
-    <p>The model runs on accelerators, chips built mostly for one kind of arithmetic: multiplying large matrices. Each has a large silicon die surrounded by stacks of high-bandwidth memory, which can feed it terabytes per second. Inside the die are grids of thousands of multiply-and-add units; in a TPU, numbers flow through such a grid in waves, each unit passing its result to the next.</p>
+    <p>The model runs on accelerators: chips built mostly for one kind of arithmetic, multiplying matrices, which are big grids of numbers. Each has a large slab of silicon at the center, the die, surrounded by stacks of fast memory that can feed it terabytes per second. The die holds grids of thousands of tiny units that each multiply two numbers and add the result to a running total.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>The fast memory is high-bandwidth memory (HBM), stacked right beside the die. In a TPU, numbers flow through a grid of multiply-and-add units in waves, each unit passing its result to the next. That design is called a systolic array.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>A server</h3>
-    <p>Several chips share a server, joined by links much faster than ordinary networking so they can work almost as one. A frontier model is generally too big for one chip's memory. Its weights, the numbers learned in training, are split across many chips, and each does part of every calculation and trades partial results with the others.</p>
+    <p>Several chips share a server, joined by links much faster than ordinary networking so they can work almost as one. A frontier model, one of the largest and most capable kind, is generally too big for one chip's memory. Its weights, the numbers learned in training, are split across many chips, and each does part of every calculation and trades partial results with the others.</p>
   </div>
   <div class="card">
     <h3>Racks, rows, halls</h3>
@@ -99,11 +117,11 @@
   </div>
   <div class="card">
     <h3>Every layer, all at once</h3>
-    <p>A transformer is a stack of layers, dozens deep, and every token passes through every layer. In each one, attention lets every token look back at the tokens before it and take in what's relevant; then a feed-forward block works on each token separately. Both are mostly matrix multiplication. The whole prompt is known up front, so all its tokens move through each layer together, which keeps the chips busy. This stage is called prefill.</p>
+    <p>The model is a kind called a transformer: a stack of layers, dozens deep, and every token passes through every layer. In each layer, attention lets every token look back at the tokens before it and take in what's relevant. Then a second part, the feed-forward block, works on each token on its own. Both are mostly matrix multiplication. The whole prompt is known up front, so all its tokens move through each layer together, which keeps the chips busy. This stage is called prefill.</p>
   </div>
   <div class="card">
     <h3>Mostly from cache</h3>
-    <p>As it goes, each layer saves two vectors per token, a key and a value, for later tokens to look back at. That's the KV cache. For the cached prefix of your request those already exist from a recent request, so only the new part runs: your message, and anything else after the breakpoint. That's a big part of why the first token can be ready in about a second.</p>
+    <p>As it goes, each layer saves two vectors per token, a key and a value, which later tokens use when they look back. That's the KV cache. For the part of your request that matches a recent one, those keys and values already exist, so only the new part runs: your message, and anything else after the breakpoint. That's a big part of why the first token can be ready in about a second.</p>
     <details class="deeper">
       <summary>More detail</summary>
       <div>
@@ -116,26 +134,26 @@
 <section class="chapter" id="decode" data-chapter="decode">
   <div class="card">
     <h2>One token at a time</h2>
-    <p>At the top of the stack, the last token's vector becomes a score for every token in the vocabulary, and the scores become probabilities. One token is picked from that distribution. That's the next token of the reply.</p>
+    <p>At the top of the stack, the last token's vector becomes a score for every token the model knows (its vocabulary). The scores become probabilities: how likely each token is to come next. One token is picked, the likely ones more often than the unlikely ones. That's the next token of the reply.</p>
   </div>
   <div class="card">
     <h3>And again</h3>
-    <p>To get the one after it, that token goes back in at the bottom and runs through every layer, looking back at everything before it through the KV cache. One full pass per token, each waiting on the last. This stage is decode. Per token, it's slow work for the chips: each pass reads billions of the model's weights from memory for a single new token.</p>
+    <p>To get the one after it, that token goes back in at the bottom and runs through every layer, looking back at everything before it through the KV cache. One full pass per token, each waiting on the last. This stage is called decode. Per token, it's slow work for the chips. Each pass reads billions of the model's weights from memory to make a single new token, and most of the time goes to waiting on memory.</p>
   </div>
   <div class="card">
     <h3>Not alone</h3>
-    <p>So the chips don't decode one conversation at a time. Each step runs the next token for a whole batch of conversations, which reads the weights once for all of them. Yours is one of many moving through the same chips in the same moment.</p>
+    <p>So the chips don't decode one conversation at a time. Each step makes the next token for a whole group of conversations at once (a batch), and reads the weights once for all of them. Yours is one of many moving through the same chips in the same moment.</p>
   </div>
   <div class="card">
     <h3>Thinking, then answering</h3>
-    <p>Current Claude models often think before answering: a run of tokens worked through first, then the reply itself. They come out at dozens of tokens a second. The thinking doesn't come back as written, at most as a summary. Each token of the reply is sent home as soon as it exists.</p>
+    <p>Current Claude models often think before answering: a run of tokens worked through first, then the reply itself. They come out at dozens of tokens a second. You don't get the thinking word for word; at most you see a summary of it. Each token of the reply is sent home as soon as it exists.</p>
   </div>
 </section>
 
 <section class="chapter" id="stream" data-chapter="stream">
   <div class="card">
     <h2>Streaming back</h2>
-    <p>The answer comes back over the same connection as a stream of server-sent events: plain text, an <code>event:</code> line and a <code>data:</code> line each. Every new piece of the reply is one event:</p>
+    <p>The answer comes back over the same connection a piece at a time, in a format called server-sent events. Each event is two lines of plain text: an <code>event:</code> line naming what kind it is, and a <code>data:</code> line with the details as JSON. Every new piece of the reply is one event:</p>
     <pre class="term">event: content_block_delta
 data: {"type":"content_block_delta","index":1,
   "delta":{"type":"text_delta","text":"Love this"}}</pre>
@@ -148,7 +166,7 @@ data: {"type": "ping"}</pre>
   </div>
   <div class="card">
     <h3>On your screen</h3>
-    <p>Claude Code reads the events as they arrive, appends the text, renders the markdown, and redraws its part of the terminal. From there every character takes the path from the end of Act I: a write to the PTY, the terminal emulator, the compositor, the next refresh, your eyes.</p>
+    <p>Claude Code reads the events as they arrive and adds the new text to the reply. The reply is in Markdown, plain text with marks like <code>**bold**</code>, so Claude Code formats it and redraws its part of the terminal. From there every character takes the path from the end of Act I: a write to the PTY, the terminal emulator, the compositor, the next refresh, your eyes.</p>
   </div>
 </section>
 
@@ -158,7 +176,7 @@ data: {"type": "ping"}</pre>
     <p>Often the reply doesn't end with an answer. It ends with a request to use a tool:</p>
     <pre class="term">{"type": "tool_use", "name": "Bash",
  "input": {"command": "ping -c 1 google.com"}}</pre>
-    <p>and the response's <code>stop_reason</code> is <code>"tool_use"</code>. The model can't run anything itself. It asks.</p>
+    <p>The response also says why the reply stopped: its <code>stop_reason</code> is <code>"tool_use"</code>. The model can't run anything itself. It asks.</p>
   </div>
   <div class="card">
     <h3>Your machine does that part</h3>
@@ -166,11 +184,11 @@ data: {"type": "ping"}</pre>
   </div>
   <div class="card">
     <h3>And back again</h3>
-    <p>It adds the output to the conversation as a <code>tool_result</code> and sends a new request with all of it: the tools, the system prompt, every message so far, the new result. The API keeps no session between requests, so every turn sends everything again. Prompt caching is what makes that affordable; everything before the new part is a cache hit.</p>
+    <p>It adds the output to the conversation as a <code>tool_result</code> and sends a new request with all of it: the tools, the system prompt, every message so far, the new result. The API doesn't remember anything between requests, so every turn sends everything again. Prompt caching is what makes that affordable: everything before the new part matches the last request, so that work is already done.</p>
   </div>
   <div class="card">
     <h3>Many laps</h3>
-    <p>A real task takes dozens or hundreds of these round trips: read a file, edit it, run the tests, read the error, edit again. The conversation grows every lap, and when it nears the model's context limit Claude Code compacts it into a summary. Subagents run loops of their own, in parallel, each with its own context.</p>
+    <p>A real task takes dozens or hundreds of these round trips: read a file, edit it, run the tests, read the error, edit again. The conversation grows every lap. A model can only take in so many tokens at once, its context window, and when the conversation nears that limit Claude Code compacts it into a summary and carries on. Subagents run loops of their own, in parallel, each with its own context.</p>
     <p>Act I keeps happening inside Act II: every web request, package download and test that touches the network.</p>
   </div>
 </section>
@@ -187,7 +205,7 @@ data: {"type": "ping"}</pre>
       <tr><td>Sent</td><td>98 bytes, one packet</td><td>~100 KB, ~70 packets</td></tr>
       <tr><td>Round trips</td><td>one</td><td>two to connect, then one per tool call, often dozens</td></tr>
       <tr><td>Time</td><td>11.8 ms</td><td>seconds per reply, minutes per task</td></tr>
-      <tr><td>Work at the far end</td><td>change one byte, fix a checksum</td><td>on the order of 10<sup>15</sup> operations per reply</td></tr>
+      <tr><td>Work at the far end</td><td>change one byte, fix a checksum</td><td>roughly a million billion (10<sup>15</sup>) arithmetic operations per reply</td></tr>
       <tr><td>Hardware</td><td>a dozen routers and one server</td><td>the same routers, then a group of accelerators among hundreds of thousands</td></tr>
     </table>
     <p class="note">The far-end numbers are orders of magnitude: model sizes aren't public, and caching changes the total a lot.</p>

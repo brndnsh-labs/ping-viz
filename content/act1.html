@@ -7,13 +7,13 @@
   </div>
   <div class="card">
     <h3>A keyboard can't speak first</h3>
-    <p>USB is polled. The keyboard waits until the computer's USB host controller asks whether it has anything to say, which happens every 1 to 8 milliseconds depending on the keyboard.</p>
-    <p>The answer is an 8-byte report: a byte of modifier keys (Shift, Ctrl and so on), a reserved byte, and up to six keys that are down right now. Enter is <code>0x28</code>.</p>
+    <p>Over USB, the keyboard can't send anything until the computer asks. The part of the computer that runs the USB ports, the host controller, checks in every 1 to 8 milliseconds depending on the keyboard and asks whether it has anything to say. Checking on a schedule like this is called polling.</p>
+    <p>The answer is an 8-byte report: a byte of modifier keys (Shift, Ctrl and so on), a reserved byte, and up to six keys that are down right now. Enter is <code>0x28</code>, which is 40 written in hexadecimal.</p>
     <pre class="term">00 00 28 00 00 00 00 00</pre>
   </div>
   <div class="card">
     <h3>An interrupt</h3>
-    <p>The host controller copies the report into main memory on its own (direct memory access) and raises an interrupt: a signal that makes a CPU core stop what it was doing, save its place, and run the kernel's handler for that device.</p>
+    <p>The host controller copies the report into main memory on its own (direct memory access) and raises an interrupt: a signal that makes a CPU core stop what it was doing, save its place, and run the kernel's handler for that device. The kernel is the core of the operating system, the part that controls the hardware and shares it out between programs.</p>
     <p>About 6 milliseconds have passed. Nothing has touched the network yet, and nothing will for a while.</p>
     <details class="deeper">
       <summary>More detail</summary>
@@ -27,16 +27,28 @@
 <section class="chapter" id="shell" data-chapter="shell">
   <div class="card">
     <h2>To the shell</h2>
-    <p>The kernel's USB HID driver reads the report, compares it with the previous one, and finds a new key: Enter went down. It turns that into an input event, <code>KEY_ENTER, value 1</code>, readable from a device file like <code>/dev/input/event3</code>.</p>
+    <p>In the kernel, the driver for USB keyboards (a driver is code that knows how to talk to one kind of device) reads the report, compares it with the previous one, and finds a new key: Enter went down. It turns that into an input event, <code>KEY_ENTER, value 1</code>, which other programs can read from a special file like <code>/dev/input/event3</code>.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>The driver is the USB HID driver. HID stands for human interface device, the USB class that covers keyboards and mice. It hands events to evdev, the kernel layer that shows each input device as a file under <code>/dev/input</code>.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>Which window gets it?</h3>
-    <p>Your desktop's compositor (on most Linux desktops now, a Wayland compositor) reads that event. It knows which window has keyboard focus, so it forwards the key there, to the terminal emulator.</p>
-    <p>The terminal emulator turns Enter into one byte, a carriage return (<code>\r</code>, 0x0D), and writes it into the pseudo-terminal, or PTY: a pair of connected ends, one held by the terminal emulator and one by the shell running inside it.</p>
+    <p>Your desktop's compositor, the program that puts every window on the screen, reads that event. It knows which window has keyboard focus, so it forwards the key there: to the terminal emulator, the app whose window you typed into.</p>
+    <p>The terminal emulator turns Enter into one byte, a carriage return (<code>\r</code>, 0x0D), a name left over from typewriters. It writes that byte into a pseudo-terminal, or PTY: a pair of connected ends, like a two-way pipe. The terminal emulator holds one end. The other belongs to the shell, the program that reads your commands and runs them.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>On most Linux desktops now the compositor is a Wayland compositor. Wayland is the protocol it uses to talk to the programs whose windows it shows.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>bash</h3>
-    <p>bash has been waiting on the other end, reading one byte at a time. While you typed, its line editor (readline) echoed each character back so it showed up on screen. A carriage return means the line is finished.</p>
+    <p>The shell here is bash. It has been waiting on the other end, reading one byte at a time. While you typed, its line editor (readline) echoed each character back so it showed up on screen. A carriage return means the line is finished.</p>
     <p>bash now has the string <code>ping google.com</code>, less than a millisecond after the interrupt.</p>
     <details class="deeper">
       <summary>More detail</summary>
@@ -50,20 +62,27 @@
 <section class="chapter" id="fork" data-chapter="fork">
   <div class="card">
     <h2>A new process</h2>
-    <p>bash splits the line into words: <code>ping</code> and <code>google.com</code>. <code>ping</code> isn't one of bash's own commands, so it has to be a program on disk. bash checks its cache of programs it has run before and, if that misses, tries each directory in <code>$PATH</code> until it finds <code>/usr/bin/ping</code>.</p>
+    <p>bash splits the line into words: <code>ping</code> and <code>google.com</code>. <code>ping</code> isn't one of bash's own commands, so it has to be a program on disk. bash checks its list of programs it has run before and, if ping isn't there, tries each folder named in <code>$PATH</code>, a setting that lists where programs live, until it finds <code>/usr/bin/ping</code>.</p>
   </div>
   <div class="card">
     <h3>fork</h3>
-    <p>To run a program, Unix first copies the process that wants to run it. bash calls <code>fork()</code> (on Linux, the <code>clone</code> system call) and the kernel makes a second bash: same memory, same open files, new process ID.</p>
-    <p>The memory isn't actually copied yet. Both processes share the same memory pages, marked read-only, and the kernel copies a page only when one of them writes to it.</p>
+    <p>A running program is called a process. Unix starts a new one in two steps, and the first is to copy the process that asks. bash calls <code>fork()</code> and the kernel makes a second bash: same memory, same open files, new process ID.</p>
+    <p>The memory isn't actually copied yet. Both processes share it, marked read-only, and the kernel copies a piece of it (a page) only when one of them writes to that piece.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p><code>fork()</code> is a system call: a request from a program to the kernel. On Linux, the C library's <code>fork()</code> makes the <code>clone</code> system call. The kernel does copy the page tables, the maps from each process's addresses to real memory. Only the memory itself waits for a write. The trick is called copy-on-write.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>exec</h3>
-    <p>The child calls <code>execve("/usr/bin/ping", ...)</code>. The kernel throws away its copy of bash, reads the start of the file, and finds an ELF program that needs a dynamic linker. It maps the program and the linker into memory, the linker maps the shared libraries ping needs (the C library among them), and ping's <code>main()</code> runs.</p>
+    <p>The copy, called the child, asks the kernel to run <code>/usr/bin/ping</code> in its place. The kernel throws away the child's copy of bash and loads ping. ping relies on shared code kept in separate files, called libraries. The biggest is the C library, which almost every program uses. Those get loaded too, and then ping starts.</p>
     <p>The parent bash waits. Your prompt comes back when the child exits.</p>
     <details class="deeper">
       <summary>More detail</summary>
       <div>
+        <p>Step by step: the child calls <code>execve("/usr/bin/ping", ...)</code>. The kernel reads the start of the file and finds an ELF program (the standard format for programs on Linux) that needs a dynamic linker. It maps the program and the linker into memory, meaning it makes them part of the process's memory and loads each piece from disk only when it's used. The linker maps the shared libraries ping needs, and ping's <code>main()</code> runs.</p>
         <p>Why copy and then replace, instead of one call? The child can change things in between: point its output at a file, join a pipe, move to another directory. That gap is how <code>ping google.com &gt; out.txt</code> works. Linux systems also offer <code>vfork</code> and <code>posix_spawn</code>, which skip most of the copying; <code>posix_spawn</code> takes a list of redirections to make in between.</p>
       </div>
     </details>
@@ -73,8 +92,14 @@
 <section class="chapter" id="dns" data-chapter="dns">
   <div class="card">
     <h2>Finding google.com</h2>
-    <p>ping can't send anything to a name. It calls <code>getaddrinfo("google.com")</code> in the C library, which reads <code>/etc/nsswitch.conf</code> to see where to look: the local <code>/etc/hosts</code> file first (nothing there), then DNS.</p>
-    <p>On many Linux systems, DNS questions go to a small local service, systemd-resolved, at <code>127.0.0.53</code>. It keeps a cache. Say it's empty, and so is the cache at your ISP's resolver, which it passes the question to. Each question is a small UDP packet to port 53.</p>
+    <p>ping can't send anything to a name. It needs an IP address, the number the internet uses to find a computer. To get one it calls <code>getaddrinfo("google.com")</code> in the C library. The library checks a settings file to see where to look: the local <code>/etc/hosts</code> file first (nothing there), then DNS, the internet's system for looking up names.</p>
+    <p>On many Linux systems, the question goes first to a small program on your own machine, systemd-resolved, which keeps recent answers in a cache. Say it's empty. It passes the question to a resolver run by your internet provider (ISP), a server whose job is finding answers. Say its cache is empty too. Each question travels as a packet: a small chunk of data with addresses on the front, which is how everything moves on the internet.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>The settings file is <code>/etc/nsswitch.conf</code>. systemd-resolved listens at <code>127.0.0.53</code>, an address that never leaves the machine. Each DNS question is a single UDP packet to port 53. UDP is the internet's simplest way to send a message, with no connection set up first and no promise it arrives.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>Ask the root</h3>
@@ -87,7 +112,7 @@
   </div>
   <div class="card">
     <h3>Ask Google</h3>
-    <p>Google's own nameserver answers with six addresses, each good for 300 seconds, and ping takes the first: <code>172.253.124.113</code>. Google hands out different addresses depending on where the question comes from, so this one is a front end near Atlanta, a few hundred kilometres from the house.</p>
+    <p>Google's own nameserver answers with six addresses, each good for 300 seconds, and ping takes the first: <code>172.253.124.113</code>. Google hands out different addresses depending on where the question comes from, so this one is a front end near Atlanta (one of Google's servers that faces the public), a few hundred kilometers from the house.</p>
     <p>Every layer caches what it learned on the way back, and ping prints its first line:</p>
     <pre class="term"><span class="ps">$</span> ping google.com
 PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
@@ -105,22 +130,28 @@ PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
 <section class="chapter" id="packet" data-chapter="packet">
   <div class="card">
     <h2>Building the packet</h2>
-    <p>ping speaks ICMP, the Internet Control Message Protocol, the same protocol routers use to report problems. ping only needs two of its message types: echo request (8) and echo reply (0).</p>
-    <p>On a modern Linux system, ping doesn't need root. It opens an unprivileged "ping socket" (<code>socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP)</code>), writes an 8-byte ICMP header and 56 bytes of data (the time, then filler), and calls <code>sendto()</code>. That system call is the line between ping and the kernel.</p>
+    <p>ping speaks ICMP, the Internet Control Message Protocol. It's the same protocol routers use to report problems (routers are the machines that pass packets along toward where they're going). ping only needs two of its message types: echo request (8) and echo reply (0).</p>
+    <p>ping opens a "ping socket", the kernel's handle for sending and receiving these messages. It writes an 8-byte ICMP header, a short label saying what kind of message this is, and then 56 bytes of data: the time, then filler. Then it calls <code>sendto()</code> to ask the kernel to send it. Requests like that are called system calls, and they're the line between a program and the kernel.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>On a modern Linux system, ping doesn't need root, the administrator account. The unprivileged ping socket is <code>socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP)</code>.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>ICMP, then IP</h3>
-    <p>The kernel puts the socket's identifier into the ICMP header and computes its checksum. Then it wraps those 64 bytes in a 20-byte IPv4 header: version, length, a time to live of 64, protocol 1 for ICMP, and the two addresses.</p>
-    <p>Where to? The routing table says 172.253.124.113 isn't on the local network, so it goes to the default gateway, the router at 192.168.1.1, out the Wi-Fi interface.</p>
+    <p>The kernel puts the socket's identifier into the ICMP header and computes its checksum, a number worked out from the bytes so the receiver can tell if any got damaged. Then it wraps those 64 bytes in a 20-byte IPv4 header, the internet's address label: version, length, a time to live of 64, protocol 1 for ICMP, and the two addresses. Every router subtracts one from the time to live and throws away a packet that reaches zero, so a lost packet can't circle forever.</p>
+    <p>Where to? The kernel's routing table, its list of where to send things, says 172.253.124.113 isn't on the local network. Anything like that goes to the default gateway: the home router at 192.168.1.1, over Wi-Fi.</p>
   </div>
   <div class="card">
     <h3>The next hop</h3>
-    <p>Wi-Fi and Ethernet deliver to hardware addresses, not IP addresses. The kernel's neighbour table already has the router's, from an ARP broadcast (who has 192.168.1.1?) the first time it needed it. A 14-byte Ethernet header goes on the front. The packet is done: 98 bytes.</p>
+    <p>Wi-Fi and Ethernet deliver to hardware addresses, which belong to network cards, not to IP addresses. The kernel already knows the router's, from the first time it needed it: it asked the whole local network "who has 192.168.1.1?" and the router answered. That question is called ARP. A 14-byte Ethernet header with the hardware addresses goes on the front. The packet is done: 98 bytes.</p>
     <div data-hexdump="request"></div>
   </div>
   <div class="card">
     <h3>Out of the machine</h3>
-    <p>The frame joins a queue (Linux's Wi-Fi layer keeps one for each device it talks to, so one busy program can't starve the others), and the driver points the network card at it in memory. The card copies it out on its own and takes it from there.</p>
+    <p>With a hardware header on, the packet is called a frame. It joins a queue (Linux's Wi-Fi layer keeps one for each device it talks to, so one busy program can't starve the others), and the driver points the network card at it in memory. The card copies it out on its own and takes it from there.</p>
     <p>From <code>sendto()</code> to the card: a few tens of microseconds. The send time is already in the data; ping wrote it there just before.</p>
     <details class="deeper">
       <summary>More detail</summary>
@@ -135,7 +166,13 @@ PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
 <section class="chapter" id="wifi" data-chapter="wifi">
   <div class="card">
     <h2>Into the air</h2>
-    <p>Before the card fetches the frame, Linux's Wi-Fi layer swaps the Ethernet header for an 802.11 header, which carries three hardware addresses instead of two, plus a short header saying the payload is IPv4. Then the card encrypts the payload with the key the laptop agreed on with the router when it joined the network (WPA2 or WPA3, both AES).</p>
+    <p>Before the card fetches the frame, Linux's Wi-Fi layer swaps the Ethernet header for a Wi-Fi one. It carries three hardware addresses instead of two, plus a short note saying what's inside is an IPv4 packet. Then the card encrypts the contents, scrambling them with a key the laptop and the router agreed on when it joined the network, so nobody else in range can read them.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>The Wi-Fi header is defined by IEEE 802.11, the Wi-Fi standard, and the short note is an LLC/SNAP header. The encryption is WPA2 or WPA3, both built on AES.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>Waiting its turn</h3>
@@ -144,12 +181,13 @@ PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
   </div>
   <div class="card">
     <h3>On the air</h3>
-    <p>Wi-Fi 6 splits its channel into hundreds of narrow subcarriers and sends a few bits on each at once, coded in the wave's amplitude and phase. With 1024-QAM, every point on that grid of possibilities stands for 10 bits.</p>
+    <p>Wi-Fi 6 splits its channel into hundreds of narrow sub-channels and sends a few bits on all of them at once. On each one, the radio wave's strength and the point it's at in its cycle (its amplitude and phase) are set to one of many combinations, and each combination stands for a group of bits. With a strong signal there are 1,024 combinations, so each one carries 10 bits.</p>
     <p>The frame takes tens of microseconds on the air, most of it a preamble the receiver uses to lock on. The router checks it and sends back an acknowledgement. If that doesn't arrive, the card tries again.</p>
     <details class="deeper">
       <summary>More detail</summary>
       <div>
         <p>Wi-Fi uses 2.4, 5 and 6 GHz bands with channels 20 to 160 MHz wide (320 MHz on Wi-Fi 7, which also goes up to 4096-QAM: 12 bits a point). At 5 GHz the wavelength is about 6 cm. How many bits each subcarrier carries changes constantly with signal quality; the 1024 grid needs a strong, clean signal.</p>
+        <p>The sub-channels are called subcarriers. The scheme is QAM, quadrature amplitude modulation, and its combinations form a grid: 1024-QAM has 1,024 points, and 2<sup>10</sup> = 1,024, so each point is 10 bits.</p>
       </div>
     </details>
   </div>
@@ -162,7 +200,7 @@ PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
   </div>
   <div class="card">
     <h3>NAT</h3>
-    <p>Every device in the house has a private address like 192.168.1.23. Those mean nothing outside, and the house has one public address. So the router rewrites the source to its own public address, <code>203.0.113.7</code>, and writes down what it did: ICMP from 192.168.1.23, identifier 23582, to 172.253.124.113. When a reply comes back with that identifier, it'll know who it's for.</p>
+    <p>Every device in the house has a private address like 192.168.1.23. Those mean nothing outside, and the house has one public address. So the router rewrites the source to its own public address, <code>203.0.113.7</code>, and writes down what it did: ICMP from 192.168.1.23, identifier 23582, to 172.253.124.113. When a reply comes back with that identifier, it'll know who it's for. This is network address translation, or NAT.</p>
     <p>It also lowers the time to live from 64 to 63, as every router does, and fixes the IP checksum.</p>
     <div data-hexdump="nat" data-layers="ip"></div>
   </div>
@@ -176,12 +214,24 @@ PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
 <section class="chapter" id="internet" data-chapter="internet">
   <div class="card">
     <h2>Across the internet</h2>
-    <p>At the ISP the light becomes packets again and passes from router to router. Each router does the same small job very fast: find the longest matching prefix for the destination in its table, subtract one from the time to live, send the packet out the right port. Big routers do it in custom chips, billions of packets a second.</p>
+    <p>At the ISP the light becomes packets again and passes from router to router. Each router does the same small job very fast: look up the destination in its table to pick the next router, subtract one from the time to live, send the packet out the right port. Big routers do it in custom chips, billions of packets a second.</p>
     <p>This ISP hauls traffic from Asheville to its core in Charlotte first. Light in fiber covers about 200 km per millisecond, and fiber rarely runs straight.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>A routing table holds blocks of addresses called prefixes, and one address can fall inside several of them: a big block, and a smaller one inside it. The router uses the most specific one, the longest matching prefix.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>Who knows the way?</h3>
-    <p>No router knows the whole internet. They know prefixes. Google's network, AS15169, announces the address blocks it owns to the networks it connects to, using BGP, and those announcements spread from network to network. The ISP's routers learned that the block holding 172.253.124.113 is reached through a connection to Google in Atlanta.</p>
+    <p>No router knows the whole internet. They know blocks of addresses. Google's network announces the blocks it owns to the networks it connects to, and those announcements spread from network to network. The ISP's routers learned that the block holding 172.253.124.113 is reached through a connection to Google in Atlanta.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>The internet is made of separately run networks called autonomous systems, each with a number. Google's is AS15169. They exchange these announcements using BGP, the Border Gateway Protocol.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>Google's network</h3>
@@ -199,11 +249,23 @@ PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
 <section class="chapter" id="google" data-chapter="google">
   <div class="card">
     <h2>Google answers</h2>
-    <p>Inside Google's edge, routers often have several equally good paths to the next stage. They pick one per flow by hashing the packet's addresses, so a flow stays on one path while the load spreads across all of them (equal-cost multipath, ECMP).</p>
+    <p>Where Google's network meets the outside world, routers often have several equally good paths to the next stage. They pick one for each flow (the packets of one conversation) by turning the packet's addresses into a number, so a flow stays on one path while the load spreads across all of them.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>This is equal-cost multipath routing, ECMP. Turning the addresses into a number is hashing: the same addresses always give the same number, so they always get the same path.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>Load balancers</h3>
-    <p>For web traffic the next layer is Maglev, Google's software load balancer: a fleet of ordinary servers that spread connections across the front ends, using consistent hashing so any of them sends a connection's packets to the same place. Google doesn't say which machines answer pings. Some machine answering for 172.253.124.113 receives the echo request.</p>
+    <p>For web traffic the next layer is Maglev, Google's load balancer. It's a fleet of ordinary servers that share incoming connections out among the front ends so none gets overloaded, and whichever Maglev machine gets a packet sends it to the same front end as the rest of its connection. Google doesn't say which machines answer pings. Some machine answering for 172.253.124.113 receives the echo request.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>Maglev does this with consistent hashing. Every Maglev machine builds the same lookup table, so they agree on where a connection goes without having to ask each other, and adding or removing a front end moves only a few connections.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>The reply</h3>
@@ -226,7 +288,13 @@ PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
 <section class="chapter" id="arrive" data-chapter="arrive">
   <div class="card">
     <h2>Back inside</h2>
-    <p>The laptop's Wi-Fi card receives the frame, acknowledges it, decrypts it, and copies it into a buffer the driver set aside in memory. Then it raises an interrupt. The kernel's handler does almost nothing except schedule the real work, which then polls the card for anything else that arrived meanwhile (NAPI). Under heavy traffic, that's much cheaper than an interrupt per packet.</p>
+    <p>The laptop's Wi-Fi card receives the frame, acknowledges it, decrypts it, and copies it into memory the driver set aside for it. Then it raises an interrupt. The kernel's handler does almost nothing except schedule the real work for a moment later. That work then polls the card, checking for anything else that arrived in the meantime, and takes it all at once. Under heavy traffic, that's much cheaper than an interrupt per packet.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>Linux calls this NAPI. While the work is pending, the card's interrupts stay off. They come back on once there's nothing left to collect.</p>
+      </div>
+    </details>
   </div>
   <div class="card">
     <h3>Up the stack</h3>
@@ -236,7 +304,7 @@ PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
   </div>
   <div class="card">
     <h3>Wake up, ping</h3>
-    <p>ping has been asleep since it sent the request, blocked in <code>recvmsg()</code> on its socket with a timeout set. The scheduler marks it runnable and soon puts it on a CPU core. It reads the reply, checks the data came back intact, and pulls its send time out of the payload.</p>
+    <p>ping has been asleep since it sent the request, waiting inside a system call, <code>recvmsg()</code>, for something to arrive on its socket, with a time limit set. The kernel's scheduler, which decides which program runs on which CPU core, marks it ready and soon gives it a core. It reads the reply, checks the data came back intact, and pulls its send time out of the payload.</p>
     <p>Received minus sent: <strong>11.8 ms</strong>.</p>
   </div>
 </section>
@@ -245,7 +313,7 @@ PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
   <div class="card">
     <h2>64 bytes from</h2>
     <p>Before printing, ping asks DNS one more question, backwards this time: what's the name for 172.253.124.113? (<code>ping -n</code> skips this.) The answer is <code>ys-in-f113.1e100.net</code>. 1e100 is a googol, the number Google is named after.</p>
-    <p>Then it formats the line and writes it to standard output, which is the PTY. The kernel passes the bytes to the other end, where the terminal emulator is waiting.</p>
+    <p>Then it formats the line and writes it to standard output, where a program's normal output goes. Here that's the PTY. The kernel passes the bytes to the other end, where the terminal emulator is waiting.</p>
     <pre class="term"><span class="ps">$</span> ping google.com
 PING google.com (172.253.124.113) 56(84) bytes of data.
 <span class="hi">64 bytes from ys-in-f113.1e100.net (172.253.124.113): icmp_seq=1 ttl=117 time=11.8 ms</span></pre>
@@ -253,11 +321,11 @@ PING google.com (172.253.124.113) 56(84) bytes of data.
   </div>
   <div class="card">
     <h3>The terminal draws</h3>
-    <p>The terminal emulator parses the bytes, updates its grid of character cells, and redraws the changed ones. Each character is a small image (a glyph) rendered from the font once and kept in a texture, so drawing a line of text is mostly copying. Many terminals do this on the GPU now. The finished window goes to the compositor.</p>
+    <p>The terminal emulator reads the bytes, updates its grid of character cells, and redraws the changed ones. Each character is a small image (a glyph) drawn from the font once and kept in a texture, an image stored ready for the graphics chip, so drawing a line of text is mostly copying. Many terminals now do this on the GPU, the computer's graphics processor. The finished window goes to the compositor.</p>
   </div>
   <div class="card">
     <h3>The screen</h3>
-    <p>The compositor combines the windows into one frame and gives it to the display controller, which sends it to the screen on the next refresh. At 60 Hz that's a wait of up to 16.7 ms. The panel updates from top to bottom, row by row, and each pixel takes a few more milliseconds to settle.</p>
+    <p>The compositor combines the windows into one frame and gives it to the display controller, the hardware that feeds the screen, which sends it on the next refresh. At 60 refreshes a second (60 Hz) that's a wait of up to 16.7 ms. The panel updates from top to bottom, row by row, and each pixel takes a few more milliseconds to settle.</p>
   </div>
   <div class="card">
     <h3>You</h3>
