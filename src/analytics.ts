@@ -43,3 +43,8 @@ export function trackChapters(root: ParentNode): void {
 export function trackNoGpu(reason: string): void {
   track("no-webgpu", { reason: reason.slice(0, 80) });
 }
+
+/** The reader started autoplay (once per page load), at this speed. */
+export function trackAutoplay(speed: number): void {
+  track("autoplay", { speed });
+}

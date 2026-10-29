@@ -35,6 +35,12 @@ export function measure(root: HTMLElement): SectionBox[] {
 export const READING_LINE = 0.5;
 export const READING_LINE_NARROW = 0.72;
 
+/** The wide layout (text beside the picture) needs room on both sides; everything else stacks. */
+export const isWide = (w: number, h: number): boolean => w >= 900 && w / Math.max(1, h) > 1.05;
+
+/** Where the reading line sits for a viewport of this size. */
+export const readingLineFor = (w: number, h: number): number => (isWide(w, h) ? READING_LINE : READING_LINE_NARROW);
+
 /**
  * Story position for a scroll offset: section index + progress through it (0..1), measured where the
  * reading line crosses the page. Clamped to [0, sections].

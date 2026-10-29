@@ -206,6 +206,81 @@ body.no-gpu {
   color: var(--muted);
 }
 
+/* Autoplay: play/pause and speed, quiet until ?play arms it. */
+.autoplay {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  margin-top: -0.2rem;
+}
+
+.autoplay button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 1.65rem;
+  min-width: 1.65rem;
+  padding: 0 0.4rem;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.76rem;
+  font-variation-settings: "MONO" 1;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+/* A bigger hit area for fingers than the button draws. */
+.autoplay button::after {
+  content: "";
+  position: absolute;
+  inset: -0.55rem -0.1rem;
+}
+
+.autoplay button:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.autoplay svg {
+  width: 0.62rem;
+  height: 0.62rem;
+  fill: currentColor;
+}
+
+.ap-play .i-pause,
+.ap-play[aria-pressed="true"] .i-play,
+.ap-word {
+  display: none;
+}
+
+.ap-play[aria-pressed="true"] .i-pause {
+  display: block;
+}
+
+.ap-play[aria-pressed="true"] {
+  color: var(--ink-soft);
+}
+
+.autoplay.armed .ap-play {
+  color: var(--accent);
+  border-color: rgba(236, 142, 162, 0.45);
+  background: rgba(236, 142, 162, 0.1);
+}
+
+.autoplay.armed .ap-word {
+  display: inline;
+}
+
 .hud-clock {
   margin-left: auto;
   text-align: right;

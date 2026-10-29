@@ -33,6 +33,14 @@
     <header id="hud" class="hud">
       <div class="progress" aria-hidden="true"><div id="hud-progress"></div></div>
       <a class="brand" href="#intro">round trip</a>
+      <div id="autoplay" class="autoplay">
+        <button type="button" class="ap-play" aria-label="Autoplay" aria-pressed="false">
+          <svg class="i-play" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1 9 5 2 9z" /></svg>
+          <svg class="i-pause" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1h2v8H2zM6 1h2v8H6z" /></svg>
+          <span class="ap-word" aria-hidden="true">play</span>
+        </button>
+        <button type="button" class="ap-speed" aria-label="Autoplay speed 1×. Change speed">1×</button>
+      </div>
       <span id="hud-act" class="hud-act"></span>
       <div id="hud-clock" class="hud-clock off" aria-live="off">
         <div class="clock"><span class="t">t =</span> <span id="hud-clock-v" class="v">0.000 ms</span></div>

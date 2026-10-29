@@ -16,7 +16,9 @@ WebGPU only runs in a secure context: use `localhost` (an SSH tunnel such as
 `ssh -L 5173:localhost:5173 <dev box>` if the dev server is remote), not a LAN IP. It needs
 Safari 26+, Chrome or Edge. Without WebGPU the text still reads; the pictures are off.
 
-URL parameters for development: `?at=dns:0.5` (jump to a chapter and progress), `?only=globe`
+`?play` arms autoplay (the page scrolls itself at reading pace; see `src/ui/autoplay.ts`): the
+play button is highlighted and the first tap, click, Enter or Space starts it. URL parameters for
+development: `?at=dns:0.5` (jump to a chapter and progress), `?only=globe`
 (load one scene, the rest are placeholders), `?scale=0.7` (fixed render scale), `?msaa=1`,
 `?dpr=1`, `?shot` (capture mode, used by the scripts).
 
@@ -42,8 +44,9 @@ URL parameters for development: `?at=dns:0.5` (jump to a chapter and progress), 
   `npm run land` into a 19 KB run-length mask.
 - **Facts** (`docs/fact-check.md`): every claim in the prose and labels, with its source.
 - **Analytics** (`src/analytics.ts`): self-hosted, cookieless Umami at umami.brndn.zip. Pageviews,
-  one `chapter` event per chapter reached, and `no-webgpu` when the page falls back to text. Only
-  ping-viz.brndn.zip reports (the tag's `data-domains`), so dev and screenshots stay silent.
+  one `chapter` event per chapter reached, `autoplay` (with its speed) the first time a reader starts
+  autoplay, and `no-webgpu` when the page falls back to text. Only ping-viz.brndn.zip reports (the
+  tag's `data-domains`), so dev and screenshots stay silent.
 
 ## Checking visuals without a GPU
 

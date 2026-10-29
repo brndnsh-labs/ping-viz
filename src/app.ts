@@ -8,7 +8,15 @@ import { placeholder } from "./scenes/placeholder";
 import type { Label, Scene, SceneFrame, SceneId } from "./scenes/scene";
 import { CHAPTERS } from "./story/chapters";
 import { plan, type SlotPlan, type StoryState } from "./story/director";
-import { measure, READING_LINE, READING_LINE_NARROW, type SectionBox, scrollFor, storyPosition } from "./story/layout";
+import {
+  isWide,
+  measure,
+  READING_LINE,
+  READING_LINE_NARROW,
+  type SectionBox,
+  scrollFor,
+  storyPosition,
+} from "./story/layout";
 import { Hud } from "./ui/hud";
 import { LabelLayer } from "./ui/labels";
 import { approach, clamp } from "./util/math";
@@ -180,7 +188,7 @@ export class App {
 
   private layoutMode(): LayoutMode {
     const aspect = this.cssW / Math.max(1, this.cssH);
-    if (this.cssW >= 900 && aspect > 1.05) return { shift: { x: 0.3, y: 0 }, narrow: false, focusUv: [0.65, 0.5] };
+    if (isWide(this.cssW, this.cssH)) return { shift: { x: 0.3, y: 0 }, narrow: false, focusUv: [0.65, 0.5] };
     if (aspect < 0.9) return { shift: { x: 0, y: 0.3 }, narrow: true, focusUv: [0.5, 0.35] };
     return { shift: { x: 0, y: 0.12 }, narrow: true, focusUv: [0.5, 0.44] };
   }

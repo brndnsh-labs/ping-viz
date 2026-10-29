@@ -4,6 +4,7 @@ import { App } from "./app";
 import { GpuUnavailableError, gpuErrors, initGpu } from "./gpu/context";
 import type { SceneId } from "./scenes/scene";
 import { CHAPTERS, chapterIndex } from "./story/chapters";
+import { initAutoplay } from "./ui/autoplay";
 import { initContent } from "./ui/content";
 
 /** What the page exposes for the headless scripts (scripts/shot.ts, scripts/smoke.ts). */
@@ -55,6 +56,14 @@ initContent(story, (focus) => {
   if (app) app.focus = focus;
 });
 trackChapters(story);
+initAutoplay({
+  story,
+  hud: document.getElementById("hud") as HTMLElement,
+  note: document.getElementById("gpu-note"),
+  controls: document.getElementById("autoplay") as HTMLElement,
+  reducedMotion,
+  armed: params.has("play"),
+});
 
 let app: App | null = null;
 
