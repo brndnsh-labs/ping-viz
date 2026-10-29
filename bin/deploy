@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Build and deploy to https://ping-viz.brndn.zip.
+# Usage: bin/deploy
+#
+# Runs the full verify gate, then rsyncs dist/ to the pelican box, where nginx serves it by Host
+# header (server block: brndn-zip, nginx/brndn.conf; TLS at the Caddy edge,
+# homelab-maintenance/caddy/Caddyfile). Refuses a dirty tree, so the build's <meta name="version">
+# (stamped by vite.config.ts) is a real commit; afterwards it checks that commit on the box (over
+# SSH, because port 80 there only accepts Caddy) and through the public edge.
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REMOTE="${PINGVIZ_SSH:-pelican-admin}"
+REMOTE_DIR="/var/www/ping-viz"
+HOST="ping-viz.brndn.zip"
+
+cd "$REPO_ROOT"
+
+if [ -n "$(git status --porcelain)" ]; then
+  echo "FAIL: uncommitted changes; deploy from a clean tree so the build matches a commit" >&2
+  exit 1
+fi
+VERSION="$(git rev-parse --short HEAD)"
+STAMP="<meta name=\"version\" content=\"$VERSION\""
+
+echo "==> Verifying and building $VERSION"
+npm run verify
+if ! grep -qF "$STAMP" dist/index.html; then
+  echo "FAIL: dist/index.html isn't stamped with $VERSION" >&2
+  exit 1
+fi
+
+echo "==> Deploying dist/ to $REMOTE:$REMOTE_DIR"
+ssh -o BatchMode=yes "$REMOTE" "mkdir -p $REMOTE_DIR"
+# --delay-updates swaps every file in at the end, so nobody loads a half-copied build.
+rsync -av --delete --delay-updates --chmod=D755,F644 dist/ "$REMOTE:$REMOTE_DIR/"
+
+echo "==> Verifying nginx on $REMOTE"
+# grep reads to EOF (no -q): with pipefail, an early exit could SIGPIPE the writer into a false FAIL
+if ssh -o BatchMode=yes "$REMOTE" \
+    "wget -q -O - --timeout=10 --tries=1 --header='Host: $HOST' http://127.0.0.1/" | grep -F "$STAMP" >/dev/null; then
+  echo "    OK: nginx serves $VERSION for Host: $HOST"
+else
+  echo "    FAIL: rsync done, but nginx did not return build $VERSION for Host: $HOST" >&2
+  exit 1
+fi
+
+echo "==> Verifying the public edge"
+if curl -fsS --max-time 15 "https://$HOST/" | grep -F "$STAMP" >/dev/null; then
+  echo "    OK: https://$HOST serves $VERSION"
+else
+  echo "    FAIL: rsync done, but https://$HOST did not return build $VERSION" >&2
+  exit 1
+fi
+
+echo "==> Done. https://$HOST"

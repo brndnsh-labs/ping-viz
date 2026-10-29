@@ -1,0 +1,267 @@
+<section class="chapter" id="enter" data-chapter="enter">
+  <div class="card">
+    <p class="kicker">Act I · ping google.com</p>
+    <h2>Enter</h2>
+    <p>Under the Enter key is a switch. Pressing it connects one row wire to one column wire in a grid that runs under every key.</p>
+    <p>The keyboard has its own small computer, a microcontroller, which checks that grid about a thousand times a second. When it sees the row and column connect, it doesn't believe it right away. Metal contacts bounce for a few milliseconds, so it waits for the signal to settle.</p>
+  </div>
+  <div class="card">
+    <h3>A keyboard can't speak first</h3>
+    <p>USB is polled. The keyboard waits until the computer's USB host controller asks whether it has anything to say, which happens every 1 to 8 milliseconds depending on the keyboard.</p>
+    <p>The answer is an 8-byte report: a byte of modifier keys (Shift, Ctrl and so on), a reserved byte, and up to six keys that are down right now. Enter is <code>0x28</code>.</p>
+    <pre class="term">00 00 28 00 00 00 00 00</pre>
+  </div>
+  <div class="card">
+    <h3>An interrupt</h3>
+    <p>The host controller copies the report into main memory on its own (direct memory access) and raises an interrupt: a signal that makes a CPU core stop what it was doing, save its place, and run the kernel's handler for that device.</p>
+    <p>About 6 milliseconds have passed. Nothing has touched the network yet, and nothing will for a while.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>Gaming keyboards poll at 1,000 Hz or faster and debounce more aggressively, so press-to-report can be under 2 ms. Bluetooth keyboards add their own radio schedule and are usually slower. The host controller here is xHCI, the standard USB 3 controller interface; it keeps rings of work in memory that the driver and the hardware both read and write.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="chapter" id="shell" data-chapter="shell">
+  <div class="card">
+    <h2>To the shell</h2>
+    <p>The kernel's USB HID driver reads the report, compares it with the previous one, and finds a new key: Enter went down. It turns that into an input event, <code>KEY_ENTER, value 1</code>, readable from a device file like <code>/dev/input/event3</code>.</p>
+  </div>
+  <div class="card">
+    <h3>Which window gets it?</h3>
+    <p>Your desktop's compositor (on most Linux desktops now, a Wayland compositor) reads that event. It knows which window has keyboard focus, so it forwards the key there, to the terminal emulator.</p>
+    <p>The terminal emulator turns Enter into one byte, a carriage return (<code>\r</code>, 0x0D), and writes it into the pseudo-terminal, or PTY: a pair of connected ends, one held by the terminal emulator and one by the shell running inside it.</p>
+  </div>
+  <div class="card">
+    <h3>bash</h3>
+    <p>bash has been waiting on the other end, reading one byte at a time. While you typed, its line editor (readline) echoed each character back so it showed up on screen. A carriage return means the line is finished.</p>
+    <p>bash now has the string <code>ping google.com</code>, less than a millisecond after the interrupt.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>The kernel's tty layer sits between the PTY's two ends. In its normal (canonical) mode it collects a whole line and handles Backspace itself. readline turns that off so it can do its own editing, history and tab completion. The same layer is what turns Ctrl-C into a SIGINT signal for whatever is running.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="chapter" id="fork" data-chapter="fork">
+  <div class="card">
+    <h2>A new process</h2>
+    <p>bash splits the line into words: <code>ping</code> and <code>google.com</code>. <code>ping</code> isn't one of bash's own commands, so it has to be a program on disk. bash checks its cache of programs it has run before and, if that misses, tries each directory in <code>$PATH</code> until it finds <code>/usr/bin/ping</code>.</p>
+  </div>
+  <div class="card">
+    <h3>fork</h3>
+    <p>To run a program, Unix first copies the process that wants to run it. bash calls <code>fork()</code> (on Linux, the <code>clone</code> system call) and the kernel makes a second bash: same memory, same open files, new process ID.</p>
+    <p>Nothing is actually copied yet. Both processes share the same memory pages, marked read-only, and the kernel copies a page only when one of them writes to it.</p>
+  </div>
+  <div class="card">
+    <h3>exec</h3>
+    <p>The child calls <code>execve("/usr/bin/ping", ...)</code>. The kernel throws away its copy of bash, reads the start of the file, and finds an ELF program that needs a dynamic linker. It maps the program and the linker into memory, the linker maps the shared libraries ping needs (the C library among them), and ping's <code>main()</code> runs.</p>
+    <p>The parent bash waits. Your prompt comes back when the child exits.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>Why copy and then replace, instead of one call? The child can change things in between: point its output at a file, join a pipe, move to another directory. That gap is how <code>ping google.com &gt; out.txt</code> works. When nothing needs changing, Linux also offers <code>posix_spawn</code> and <code>vfork</code>, which skip most of the copying.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="chapter" id="dns" data-chapter="dns">
+  <div class="card">
+    <h2>Finding google.com</h2>
+    <p>ping can't send anything to a name. It calls <code>getaddrinfo("google.com")</code> in the C library, which reads <code>/etc/nsswitch.conf</code> to see where to look: the local <code>/etc/hosts</code> file first (nothing there), then DNS.</p>
+    <p>On many Linux systems, DNS questions go to a small local service, systemd-resolved, at <code>127.0.0.53</code>. It keeps a cache. Say it's empty, and so is the cache at your ISP's resolver, which it passes the question to. Each question is a small UDP packet to port 53.</p>
+  </div>
+  <div class="card">
+    <h3>Ask the root</h3>
+    <p>With nothing cached, the resolver starts at the top. DNS has 13 root server names, <code>a.root-servers.net</code> through <code>m</code>, run by 12 organizations. Each name is served from many places at once: about 2,000 machines around the world share those 13 addresses, and ordinary internet routing delivers your question to a nearby one. That's called anycast.</p>
+    <p>The root doesn't know google.com. It answers with a referral: here are the servers for <code>.com</code>.</p>
+  </div>
+  <div class="card">
+    <h3>Ask .com</h3>
+    <p>The .com servers (run by Verisign, also anycast) don't know google.com's address either, but they know who does: <code>ns1.google.com</code> through <code>ns4</code>. They include those servers' addresses in the answer, since otherwise you'd need google.com to find google.com.</p>
+  </div>
+  <div class="card">
+    <h3>Ask Google</h3>
+    <p>Google's own nameserver answers: <code>google.com A 172.253.124.113</code>, good for 300 seconds. Google hands out different addresses depending on where the question comes from, so this one is a front end near Atlanta, a few hundred kilometres from the house.</p>
+    <p>Every layer caches what it learned on the way back, and ping prints its first line:</p>
+    <pre class="term"><span class="ps">$</span> ping google.com
+PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
+    <p class="note">This was the slow path. Usually a cache somewhere along the way already has the answer and the lookup takes well under a millisecond.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>ping asked for IPv6 addresses too. On a network with working IPv6, the C library would usually put the IPv6 address first and the rest of this story would run over IPv6: longer addresses, ICMPv6 instead of ICMP, and no NAT at the router.</p>
+        <p>Google picks the address from where the question seems to come from: the resolver's address, or a truncated piece of yours if the resolver passes it along (EDNS Client Subnet).</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="chapter" id="packet" data-chapter="packet">
+  <div class="card">
+    <h2>Building the packet</h2>
+    <p>ping speaks ICMP, the Internet Control Message Protocol, the same protocol routers use to report problems. ping only needs two of its message types: echo request (8) and echo reply (0).</p>
+    <p>On a modern Linux system, ping doesn't need root. It opens an unprivileged "ping socket" (<code>socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP)</code>), writes an 8-byte ICMP header and 56 bytes of data (the time, then filler), and calls <code>sendto()</code>. That system call is the line between ping and the kernel.</p>
+  </div>
+  <div class="card">
+    <h3>ICMP, then IP</h3>
+    <p>The kernel puts the socket's identifier into the ICMP header and computes its checksum. Then it wraps those 64 bytes in a 20-byte IPv4 header: version, length, a time to live of 64, protocol 1 for ICMP, and the two addresses.</p>
+    <p>Where to? The routing table says 172.253.124.113 isn't on the local network, so it goes to the default gateway, the router at 192.168.1.1, out the Wi-Fi interface.</p>
+  </div>
+  <div class="card">
+    <h3>The next hop</h3>
+    <p>Wi-Fi and Ethernet deliver to hardware addresses, not IP addresses. The kernel's neighbour table already has the router's, from an ARP broadcast (who has 192.168.1.1?) the first time it needed it. A 14-byte Ethernet header goes on the front. The packet is done: 98 bytes.</p>
+    <div data-hexdump="request"></div>
+  </div>
+  <div class="card">
+    <h3>Out of the machine</h3>
+    <p>The frame joins a queue (the queueing discipline, which keeps one busy program from starving the others), and the Wi-Fi driver points the network card at it in memory. The card copies it out on its own and takes it from there.</p>
+    <p>From <code>sendto()</code> to the card: a few tens of microseconds. The send time is already in the data; ping wrote it there just before.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>The Internet checksum is a one's-complement sum of the header's 16-bit words. It's cheap enough that every router updates it after changing the time to live. ICMP has its own checksum over the ICMP header and data.</p>
+        <p>The IP identification field is 0 because the Don't Fragment flag is set: nothing will be split, so nothing needs reassembling. 56 data bytes is ping's default because 56 + 8 = 64.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="chapter" id="wifi" data-chapter="wifi">
+  <div class="card">
+    <h2>Into the air</h2>
+    <p>The Wi-Fi driver swaps the Ethernet header for an 802.11 header, which carries three hardware addresses instead of two, plus a short header saying the payload is IPv4. Then the card encrypts the payload with the key the laptop agreed on with the router when it joined the network (WPA2 or WPA3, both AES).</p>
+  </div>
+  <div class="card">
+    <h3>Waiting its turn</h3>
+    <p>Every device in the house shares one radio channel, and only one can talk at a time. So the card listens first. If the channel is busy, it waits. When it goes quiet, it waits a random number of short slots more, so two devices that were both waiting don't start at the same instant.</p>
+    <p>This time the phone gets the channel first. The laptop waits it out, then counts down its own random wait and goes.</p>
+  </div>
+  <div class="card">
+    <h3>On the air</h3>
+    <p>Wi-Fi 6 splits its channel into hundreds of narrow subcarriers and sends a few bits on each at once, coded in the wave's amplitude and phase. With 1024-QAM, every point on that grid of possibilities stands for 10 bits.</p>
+    <p>The frame takes tens of microseconds on the air, most of it a preamble the receiver uses to lock on. The router checks it and sends back an acknowledgement. If that doesn't arrive, the card tries again.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p>Wi-Fi uses 2.4, 5 and 6 GHz bands with channels 20 to 160 MHz wide (320 MHz on Wi-Fi 7, which also goes up to 4096-QAM: 12 bits a point). At 5 GHz the wavelength is about 6 cm. How many bits each subcarrier carries changes constantly with signal quality; the 1024 grid needs a strong, clean signal.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="chapter" id="router" data-chapter="router">
+  <div class="card">
+    <h2>The router</h2>
+    <p>The router decrypts the frame, takes off the Wi-Fi header, and reads the IP destination. It isn't anyone in the house, so the packet goes out the other side, toward the internet.</p>
+  </div>
+  <div class="card">
+    <h3>NAT</h3>
+    <p>Every device in the house has a private address like 192.168.1.23. Those mean nothing outside, and the house has one public address. So the router rewrites the source to its own public address, <code>203.0.113.7</code>, and writes down what it did: ICMP from 192.168.1.23, identifier 23582, to 172.253.124.113. When a reply comes back with that identifier, it'll know who it's for.</p>
+    <p>It also lowers the time to live from 64 to 63, as every router does, and fixes the IP checksum.</p>
+    <div data-hexdump="nat" data-layers="ip"></div>
+  </div>
+  <div class="card">
+    <h3>Light</h3>
+    <p>The router hands the packet to the fiber terminal on the wall, which turns it into pulses of laser light. Fiber to the home is usually a passive optical network: one strand from the street is split among dozens of homes, so they take turns sending, each in time slots the ISP's equipment assigns. The packet waits for the house's slot, a fraction of a millisecond, then goes.</p>
+    <p>The light stays inside a glass core about 9 microns across and travels at about two thirds of its speed in a vacuum.</p>
+  </div>
+</section>
+
+<section class="chapter" id="internet" data-chapter="internet">
+  <div class="card">
+    <h2>Across the internet</h2>
+    <p>At the ISP the light becomes packets again and passes from router to router. Each router does the same small job very fast: find the longest matching prefix for the destination in its table, subtract one from the time to live, send the packet out the right port. Big routers do it in custom chips, billions of packets a second.</p>
+    <p>This ISP hauls traffic from Asheville to its core in Charlotte first. Light in fiber covers about 200 km per millisecond, and fiber rarely runs straight.</p>
+  </div>
+  <div class="card">
+    <h3>Who knows the way?</h3>
+    <p>No router knows the whole internet. They know prefixes. Google's network, AS15169, announces the address blocks it owns to the networks it connects to, using BGP, and those announcements spread from network to network. The ISP's routers learned that the block holding 172.253.124.113 is reached through a connection to Google in Atlanta.</p>
+  </div>
+  <div class="card">
+    <h3>Google's network</h3>
+    <p>The ISP hands the packet to Google in Atlanta, and Google's own fiber carries it the rest of the way to the front end that owns the address. Google connects directly to most large ISPs, close to their customers, so the trip rarely crosses anyone else's network.</p>
+    <p>About 5 milliseconds after leaving the house, it arrives.</p>
+    <details class="deeper">
+      <summary>More detail</summary>
+      <div>
+        <p><code>traceroute google.com</code> shows the path by abusing the time to live: it sends packets with TTL 1, then 2, then 3, and each router that drops one at zero sends back an ICMP "time exceeded" message, revealing itself. Many routers inside large networks don't answer, which is why traceroutes are full of asterisks.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="chapter" id="google" data-chapter="google">
+  <div class="card">
+    <h2>Google answers</h2>
+    <p>Inside Google's edge, routers often have several equally good paths to the next stage. They pick one per flow by hashing the packet's addresses, so a flow stays on one path while the load spreads across all of them (equal-cost multipath, ECMP).</p>
+  </div>
+  <div class="card">
+    <h3>Load balancers</h3>
+    <p>For web traffic the next layer is Maglev, Google's software load balancer: a fleet of ordinary servers that spread connections across the front ends, using consistent hashing so any of them sends a connection's packets to the same place. A ping needs less than that. One of the machines answering for 172.253.124.113 receives the echo request.</p>
+  </div>
+  <div class="card">
+    <h3>The reply</h3>
+    <p>Answering a ping is cheap: change the type from 8 to 0, swap the source and destination addresses, keep the identifier, sequence number and data exactly as they arrived, fix the checksum, and send it back. The timestamp ping wrote goes home untouched.</p>
+    <p>Microseconds of work. Nearly all of the round trip is distance.</p>
+  </div>
+</section>
+
+<section class="chapter" id="return" data-chapter="return">
+  <div class="card">
+    <h2>The way back</h2>
+    <p>The reply makes its way the same way, router by router, but nothing makes it take the same route. Each direction is routed on its own, so a reply can enter the ISP somewhere else or take a different path inside it. This one comes back through Greenville.</p>
+  </div>
+  <div class="card">
+    <h3>Home</h3>
+    <p>Downstream on the fiber, the ISP sends to every home on the strand and each terminal keeps only its own traffic. The router looks up identifier 23582 in its NAT table, rewrites the destination back to 192.168.1.23, and sends the reply over Wi-Fi to the laptop.</p>
+  </div>
+</section>
+
+<section class="chapter" id="arrive" data-chapter="arrive">
+  <div class="card">
+    <h2>Back inside</h2>
+    <p>The laptop's Wi-Fi card receives the frame, acknowledges it, decrypts it, and copies it into a buffer the driver set aside in memory. Then it raises an interrupt. The kernel's handler does almost nothing except schedule the real work, which then polls the card for anything else that arrived meanwhile (NAPI). Under heavy traffic, that's much cheaper than an interrupt per packet.</p>
+  </div>
+  <div class="card">
+    <h3>Up the stack</h3>
+    <p>The kernel takes the layers off in reverse. Ethernet says IPv4. IP says it's for this machine and the checksum is fine. ICMP says echo reply, identifier 23582, which belongs to ping's socket. The data goes into that socket's receive queue with the time it arrived.</p>
+    <p>The reply, as it arrives. Compare it with the request: type 0, the addresses swapped, a time to live of 117, and the same 56 bytes of data.</p>
+    <div data-hexdump="reply"></div>
+  </div>
+  <div class="card">
+    <h3>Wake up, ping</h3>
+    <p>ping has been asleep since it sent the request, blocked in <code>recvmsg()</code> on its socket with a timeout set. The scheduler marks it runnable and soon puts it on a CPU core. It reads the reply, checks the data came back intact, and pulls its send time out of the payload.</p>
+    <p>Received minus sent: <strong>11.8 ms</strong>.</p>
+  </div>
+</section>
+
+<section class="chapter" id="print" data-chapter="print">
+  <div class="card">
+    <h2>64 bytes from</h2>
+    <p>Before printing, ping asks DNS one more question, backwards this time: what's the name for 172.253.124.113? (<code>ping -n</code> skips this.) The answer is <code>ys-in-f113.1e100.net</code>. 1e100 is a googol, the number Google is named after.</p>
+    <p>Then it formats the line and writes it to standard output, which is the PTY. The kernel passes the bytes to the other end, where the terminal emulator is waiting.</p>
+    <pre class="term"><span class="ps">$</span> ping google.com
+PING google.com (172.253.124.113) 56(84) bytes of data.
+<span class="hi">64 bytes from ys-in-f113.1e100.net (172.253.124.113): icmp_seq=1 ttl=117 time=11.8 ms</span></pre>
+    <p class="note">64 bytes is the ICMP part: header plus data. ttl=117 is what was left of the reply's time to live; if Google started it at 128, it passed 11 routers.</p>
+  </div>
+  <div class="card">
+    <h3>The terminal draws</h3>
+    <p>The terminal emulator parses the bytes, updates its grid of character cells, and redraws the changed ones. Each character is a small image (a glyph) rendered from the font once and kept in a texture, so drawing a line of text is mostly copying. Many terminals do this on the GPU now. The finished window goes to the compositor.</p>
+  </div>
+  <div class="card">
+    <h3>The screen</h3>
+    <p>The compositor combines the windows into one frame and gives it to the display controller, which sends it to the screen on the next refresh. At 60 Hz that's a wait of up to 16.7 ms. The panel updates from top to bottom, row by row, and each pixel takes a few more milliseconds to settle.</p>
+  </div>
+  <div class="card">
+    <h3>You</h3>
+    <p>Light from the screen reaches your eyes in under two nanoseconds. Noticing the new line takes you something like 200 milliseconds. The trip to Google and back took 11.8.</p>
+    <p>Then ping sleeps for a second and sends <code>icmp_seq=2</code>. It already has the address this time.</p>
+  </div>
+</section>

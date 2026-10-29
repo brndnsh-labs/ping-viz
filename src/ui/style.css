@@ -1,0 +1,684 @@
+/* Round Trip. Ink-black stage, glass cards, Recursive throughout: the sans voice for prose and the
+   mono voice (MONO axis) for anything a computer would print. One wine accent, as on brndn.zip. */
+
+@font-face {
+  font-family: "Recursive";
+  src: url("/fonts/recursive-latin.woff2") format("woff2");
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg: #05060a;
+  --ink: #e1e5ec;
+  --ink-soft: #b9c0cb;
+  --muted: #8a93a1;
+  --faint: #5d6574;
+  --accent: #ec8ea2;
+  --glass: rgba(8, 10, 16, 0.74);
+  --glass-strong: rgba(8, 10, 16, 0.9);
+  --edge: rgba(255, 255, 255, 0.075);
+  --edge-strong: rgba(255, 255, 255, 0.14);
+  --code: #ffd9ae;
+  --sans: "Recursive", ui-sans-serif, system-ui, sans-serif;
+  --card-w: 30rem;
+  --gutter: clamp(1rem, 4.5vw, 4rem);
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  background: var(--bg);
+  scroll-behavior: auto;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-variation-settings: "MONO" 0;
+  font-weight: 400;
+  font-size: 1.02rem;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+code,
+kbd,
+pre,
+.mono {
+  font-family: var(--sans);
+  font-variation-settings: "MONO" 1;
+}
+
+/* ---- Stage ------------------------------------------------------------------------------- */
+
+#stage {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+}
+
+body.no-gpu #stage {
+  display: none;
+}
+
+body.no-gpu {
+  background: radial-gradient(ellipse 70% 60% at 65% 45%, rgba(40, 60, 120, 0.22), transparent 70%), var(--bg);
+  background-attachment: fixed;
+}
+
+.labels {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  color: var(--ink-soft);
+  text-shadow:
+    0 0 6px rgba(0, 0, 0, 0.9),
+    0 0 2px rgba(0, 0, 0, 0.9);
+  will-change: transform, opacity;
+}
+
+.label > * {
+  pointer-events: none;
+}
+
+.label.left {
+  translate: 0.45rem -50%;
+}
+.label.center {
+  translate: -50% -50%;
+}
+.label.right {
+  translate: calc(-100% - 0.45rem) -50%;
+}
+.label.name {
+  font-weight: 560;
+  letter-spacing: 0.005em;
+}
+.label.note {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+.label.mono {
+  font-variation-settings: "MONO" 1;
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+}
+.label.big {
+  font-size: 1.05rem;
+  font-weight: 620;
+  color: var(--ink);
+}
+
+/* ---- HUD --------------------------------------------------------------------------------- */
+
+.hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  padding: 0.9rem var(--gutter) 0;
+  pointer-events: none;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.progress > div {
+  height: 100%;
+  background: var(--accent);
+  opacity: 0.7;
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+
+.hud::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 6.5rem;
+  background: linear-gradient(to bottom, rgba(5, 6, 10, 0.92), rgba(5, 6, 10, 0.6) 55%, transparent);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.brand,
+.hud-act {
+  pointer-events: auto;
+}
+
+.brand {
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-weight: 620;
+  letter-spacing: 0.01em;
+}
+
+.hud-act {
+  color: var(--muted);
+}
+
+.hud-clock {
+  margin-left: auto;
+  text-align: right;
+  transition: opacity 0.4s ease;
+}
+
+.hud-clock.off {
+  opacity: 0;
+}
+
+.hud-clock .clock {
+  font-variation-settings: "MONO" 1;
+  font-size: 1.55rem;
+  line-height: 1.15;
+  color: var(--ink);
+  font-weight: 450;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+}
+
+.hud-clock .t {
+  color: var(--faint);
+}
+
+.hud-clock .since {
+  font-size: 0.74rem;
+  color: var(--faint);
+}
+
+.hud-clock .where {
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ---- Chapter rail ------------------------------------------------------------------------ */
+
+.rail {
+  position: fixed;
+  right: 0.55rem;
+  top: 50%;
+  translate: 0 -50%;
+  z-index: 3;
+}
+
+.rail ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rail li.act-start:not(:first-child) {
+  margin-top: 0.65rem;
+}
+
+.rail a {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  height: 1.05rem;
+  padding: 0 0.3rem;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.rail .dot {
+  order: 2;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--faint);
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease;
+}
+
+.rail .name {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+}
+
+.rail:hover .name,
+.rail a:focus-visible .name {
+  opacity: 1;
+}
+
+.rail a[aria-current] .dot {
+  background: var(--accent);
+  transform: scale(1.6);
+}
+
+.rail a[aria-current] .name {
+  color: var(--ink);
+}
+
+/* No-WebGPU note. */
+.gpu-note {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  translate: -50% 0;
+  z-index: 4;
+  width: min(36rem, calc(100vw - 2rem));
+  padding: 0.7rem 1rem;
+  background: var(--glass-strong);
+  border: 1px solid var(--edge-strong);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.gpu-note p {
+  margin: 0;
+}
+
+/* ---- Story ------------------------------------------------------------------------------- */
+
+.story {
+  position: relative;
+  z-index: 2;
+  padding-bottom: 50svh;
+}
+
+.chapter {
+  position: relative;
+  padding: var(--pad, 55svh) 0;
+}
+
+.card {
+  position: relative;
+  width: min(var(--card-w), calc(100vw - 2 * var(--gutter)));
+  margin-left: var(--gutter);
+  padding: 1.1rem 1.35rem 1.2rem;
+  background: var(--glass);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  backdrop-filter: blur(12px) saturate(1.15);
+}
+
+.card + .card {
+  margin-top: var(--gap, 80svh);
+}
+
+.card h1,
+.card h2 {
+  margin: 0 0 0.55rem;
+  line-height: 1.22;
+  color: #f2f4f8;
+  letter-spacing: -0.01em;
+}
+
+.card h1 {
+  font-size: 1.6rem;
+  font-weight: 640;
+}
+
+.card h2 {
+  font-size: 1.3rem;
+  font-weight: 640;
+}
+
+.card h3 {
+  margin: 1rem 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 620;
+  color: var(--ink);
+}
+
+.card p {
+  margin: 0 0 0.75rem;
+  color: var(--ink);
+}
+
+.card p:last-child {
+  margin-bottom: 0;
+}
+
+.card .kicker {
+  margin: 0 0 0.3rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variation-settings: "MONO" 1;
+}
+
+.card ul,
+.card ol {
+  margin: 0 0 0.75rem;
+  padding-left: 1.2rem;
+}
+
+.card li {
+  margin: 0.2rem 0;
+}
+
+.card li::marker {
+  color: var(--faint);
+}
+
+.card code {
+  font-size: 0.9em;
+  color: var(--code);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  padding: 0.05em 0.3em;
+  overflow-wrap: anywhere;
+}
+
+.card small,
+.card .note {
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+/* Terminal output. */
+.term {
+  margin: 0.4rem 0 0.8rem;
+  padding: 0.65rem 0.85rem;
+  background: rgba(2, 3, 6, 0.85);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #d6dbe3;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.term .ps {
+  color: var(--accent);
+}
+
+.term .dim {
+  color: var(--faint);
+}
+
+.term .hi {
+  color: #fff;
+}
+
+/* Go deeper. */
+details.deeper {
+  margin-top: 0.8rem;
+  border-top: 1px solid var(--edge);
+  padding-top: 0.6rem;
+}
+
+details.deeper > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.85rem;
+  color: var(--accent);
+  user-select: none;
+}
+
+details.deeper > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.deeper > summary::before {
+  content: "+ ";
+  font-variation-settings: "MONO" 1;
+}
+
+details.deeper[open] > summary::before {
+  content: "− ";
+}
+
+details.deeper > div {
+  margin-top: 0.55rem;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+details.deeper > div p {
+  color: var(--ink-soft);
+}
+
+/* Field tags (hover to highlight in the scene). */
+[data-focus] {
+  cursor: default;
+  border-radius: 3px;
+  transition: background 0.15s ease;
+}
+
+[data-focus]:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.swatch {
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 2px;
+  margin-right: 0.3em;
+  vertical-align: 0.02em;
+}
+
+/* Hexdump. */
+.hexdump {
+  margin: 0.5rem 0 0.8rem;
+  padding: 0.6rem 0.7rem;
+  background: rgba(2, 3, 6, 0.85);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  font-variation-settings: "MONO" 1;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.hex-row {
+  display: flex;
+  gap: 0.32em;
+  white-space: nowrap;
+}
+
+.hex-off {
+  color: var(--faint);
+  margin-right: 0.45em;
+}
+
+.hb {
+  border-radius: 2px;
+  padding: 0 0.04em;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.hb.link {
+  color: #e69bff;
+}
+.hb.ip {
+  color: #8fb0ff;
+}
+.hb.icmp {
+  color: #ffa066;
+}
+.hb.data {
+  color: #ffe2bf;
+}
+.hb.dim {
+  opacity: 0.35;
+}
+.hb.on {
+  background: rgba(255, 255, 255, 0.85);
+  color: #05060a;
+  opacity: 1;
+}
+
+.hex-info {
+  margin-top: 0.5rem;
+  min-height: 2.6em;
+  font-variation-settings: "MONO" 0;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.hex-info code {
+  font-size: 0.95em;
+}
+
+@media (max-width: 420px) {
+  .hexdump {
+    font-size: 0.64rem;
+  }
+}
+
+/* Intro. */
+.chapter.intro {
+  --pad: 26svh;
+}
+
+.hero .prompt {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+  color: #fff;
+}
+
+.hero .prompt .ps {
+  color: var(--accent);
+}
+
+.caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.1em;
+  margin-left: 0.08em;
+  vertical-align: -0.18em;
+  background: #fff;
+  animation: blink 1.1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.hint {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+/* Tables. */
+.card table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin: 0.4rem 0 0.8rem;
+}
+
+.card th,
+.card td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.35rem 0.4rem;
+  border-bottom: 1px solid var(--edge);
+}
+
+.card th {
+  color: var(--muted);
+  font-weight: 560;
+}
+
+/* ---- Narrow layouts: text at the bottom, the subject above it ------------------------------ */
+
+@media (max-width: 899px), (max-aspect-ratio: 21 / 20) {
+  :root {
+    --gutter: 0.9rem;
+  }
+
+  .card {
+    width: calc(100vw - 2 * var(--gutter));
+    font-size: 0.97rem;
+  }
+
+  .chapter {
+    padding: var(--pad, 70svh) 0 var(--pad, 55svh);
+  }
+
+  .rail {
+    display: none;
+  }
+
+  .hud {
+    padding-top: 0.6rem;
+  }
+
+  .hud-act {
+    display: none;
+  }
+
+  .hud-clock .clock {
+    font-size: 1.15rem;
+  }
+
+  /* Scene captions wrap instead of running off a phone screen. */
+  .label.big {
+    white-space: normal;
+    width: max-content;
+    max-width: 70vw;
+    text-align: center;
+    font-size: 0.92rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+  }
+}
