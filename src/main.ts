@@ -6,6 +6,7 @@ import type { SceneId } from "./scenes/scene";
 import { CHAPTERS, chapterIndex } from "./story/chapters";
 import { initAutoplay } from "./ui/autoplay";
 import { initContent } from "./ui/content";
+import { initStats } from "./ui/stats";
 
 /** What the page exposes for the headless scripts (scripts/shot.ts, scripts/smoke.ts). */
 export interface PingDebug {
@@ -91,6 +92,8 @@ async function boot(): Promise<void> {
       sampleCount: params.get("msaa") === "1" ? 1 : 4,
       reducedMotion,
       maxDpr: Number(params.get("dpr") ?? 2),
+      frameCap: !params.has("nocap"),
+      stats: params.has("stats"),
       look: Object.fromEntries(
         ["bloom", "exposure", "vignette", "grain", "saturation", "power"]
           .filter((k) => params.has(k))
@@ -135,6 +138,7 @@ async function boot(): Promise<void> {
     debug.cards = (id) => a.cardCentres(id);
     debug.gpu = "ok";
     a.start();
+    if (params.has("stats")) initStats(() => a.perf());
     // Compile the other scenes' shaders while the reader is on the first card. Screenshots wait for it.
     const warmed = a.warm().catch((e) => console.error("ping-viz: warm-up failed", e));
     if (shot) await warmed;

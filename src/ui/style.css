@@ -757,3 +757,22 @@ details.deeper > div p {
     animation: none;
   }
 }
+
+/* `?stats`: frame timing readout (ui/stats.ts). */
+.stats {
+  position: fixed;
+  left: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 10;
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  background: var(--glass-strong);
+  border: 1px solid var(--edge-strong);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--ink-soft);
+  pointer-events: none;
+  white-space: pre;
+}

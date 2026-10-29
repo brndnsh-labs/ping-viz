@@ -29,8 +29,34 @@ export interface AppOptions {
   sampleCount: number;
   reducedMotion: boolean;
   maxDpr: number;
+  /** Skip a display refresh that comes sooner than MIN_FRAME_GAP_MS after the last frame (`?nocap` turns it off). */
+  frameCap: boolean;
+  /** Time GPU work per frame (`?stats`). */
+  stats: boolean;
   /** Overrides for the post-processing look (tuning: `?bloom=0.6&exposure=1.1`). */
   look: Partial<PostParams>;
+}
+
+/**
+ * The shortest gap between frames. A 120 Hz screen (8.3 ms per refresh) draws every other refresh, so
+ * 60 fps; 60 Hz (16.7 ms) and 90 Hz (11.1 ms) screens draw every refresh. Every scene moves slowly, so
+ * 120 fps would double the GPU work (and battery) for nothing visible.
+ */
+export const MIN_FRAME_GAP_MS = 10;
+
+/** One stats sample (see ui/stats.ts): averages since the previous call to App.perf(). */
+export interface PerfSample {
+  frames: number;
+  /** Mean CPU time per frame in tick(), ms. */
+  cpuMs: number;
+  /** Submit to GPU-done for the most recent sampled frame, ms (includes queueing; -1 before the first). */
+  gpuMs: number;
+  /** Longest gap between drawn frames, ms. */
+  worstGapMs: number;
+  renderScale: number;
+  width: number;
+  height: number;
+  scenes: string[];
 }
 
 interface LayoutMode {
@@ -69,6 +95,11 @@ export class App {
   private running = false;
   private lastCameras: CameraState[] = [];
   private frameErrors = 0;
+  private perfFrames = 0;
+  private perfCpu = 0;
+  private perfWorstGap = 0;
+  private gpuMs = -1;
+  private gpuPending = false;
 
   constructor(gpu: Gpu, opts: AppOptions) {
     this.gpu = gpu;
@@ -103,6 +134,7 @@ export class App {
       if (!this.running) return;
       // Schedule first, so one bad frame can't stop the picture for the rest of the visit.
       requestAnimationFrame(loop);
+      if (this.opts.frameCap && !this.opts.capture && now - this.lastNow < MIN_FRAME_GAP_MS) return;
       try {
         this.tick(now);
       } catch (e) {
@@ -174,6 +206,25 @@ export class App {
 
   capture(): Promise<CapturedFrame> {
     return this.renderer.capture();
+  }
+
+  /** Frame timing since the last call (for the `?stats` overlay). */
+  perf(): PerfSample {
+    const n = this.perfFrames;
+    const sample: PerfSample = {
+      frames: n,
+      cpuMs: n > 0 ? this.perfCpu / n : 0,
+      gpuMs: this.gpuMs,
+      worstGapMs: this.perfWorstGap,
+      renderScale: this.renderScale,
+      width: this.renderer.width,
+      height: this.renderer.height,
+      scenes: this.state?.slots.map((s) => s.scene) ?? [],
+    };
+    this.perfFrames = 0;
+    this.perfCpu = 0;
+    this.perfWorstGap = 0;
+    return sample;
   }
 
   /** The cameras used for the last frame (debugging). */
@@ -255,6 +306,8 @@ export class App {
   }
 
   private tick(now: number): void {
+    const start = performance.now();
+    if (this.lastNow >= 0) this.perfWorstGap = Math.max(this.perfWorstGap, now - this.lastNow);
     const dt = this.lastNow < 0 ? 1 / 60 : clamp((now - this.lastNow) / 1000, 0, 0.1);
     this.lastNow = now;
     this.time += this.opts.capture ? 1 / 60 : dt;
@@ -308,6 +361,24 @@ export class App {
     this.lastCameras = cams;
     this.renderer.render(draws, this.time, this.frame, { focus: mode.focusUv, ...this.opts.look });
     this.hud.update(state.index, state.p, state.chapter);
+    this.perfFrames++;
+    this.perfCpu += performance.now() - start;
+    if (this.opts.stats && !this.gpuPending) this.timeGpu();
     this.onFrame?.();
+  }
+
+  /** Time from now (just after submit) until the GPU finishes this frame. One frame in flight at a time. */
+  private timeGpu(): void {
+    this.gpuPending = true;
+    const t0 = performance.now();
+    this.gpu.device.queue.onSubmittedWorkDone().then(
+      () => {
+        this.gpuMs = performance.now() - t0;
+        this.gpuPending = false;
+      },
+      () => {
+        this.gpuPending = false;
+      },
+    );
   }
 }
