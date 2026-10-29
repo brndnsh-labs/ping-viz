@@ -18,8 +18,10 @@ live on the date above).
 | shell | HID driver → evdev `KEY_ENTER, value 1`; Wayland compositor; CR into a PTY | sourced | hid-input.c; event-codes.rst; pty(7) |
 | shell | readline reads raw bytes and sees `\r` (ICRNL off); tty canonical mode; Ctrl-C → SIGINT | sourced | readline rltty.c; termios(3) |
 | fork | `$PATH` walk and hash; fork = clone; copy-on-write (page tables are copied, memory isn't) | sourced | bash(1); glibc arch-fork.h; fork(2) |
+| fork | almost every program uses the C library | estimate | dynamically linked userland; glibc/musl |
 | fork | execve, ELF + PT_INTERP, ld.so maps libc; vfork/posix_spawn, posix_spawn file actions | sourced | execve(2), ld.so(8), posix_spawn(3) |
 | dns | getaddrinfo → nsswitch (files, dns); systemd-resolved at 127.0.0.53 | sourced | nsswitch.conf(5); systemd-resolved.service(8) |
+| dns | 127.0.0.53 is loopback (never leaves the machine); UDP: no connection, no delivery promise | sourced | RFC 1122 §3.2.1.3; RFC 768 |
 | dns | both caches cold | scenario | Notes card |
 | dns | 13 root names, 12 operators, ~2,000 instances, anycast | sourced | root-servers.org (2,049 instances) |
 | dns | .com (Verisign) refers to ns1-4.google.com with glue | measured | `dig google.com @a.gtld-servers.net` |
@@ -39,9 +41,11 @@ live on the date above).
 | router | GPON: split among dozens of homes, time slots; ~9 µm core; ~2/3 c | sourced | ITU-T G.984; G.652 |
 | internet | longest-prefix match, TTL − 1; billions of pps per router | sourced | RFC 1812; vendor specs |
 | internet | Asheville → Charlotte → Atlanta, ~5 ms one way | scenario / estimate | ~650 km of fiber at 200 km/ms + hops |
+| internet | autonomous systems: separately run networks, each numbered; BGP between them | sourced | RFC 1930; RFC 4271 |
 | internet | AS15169 announces the block via BGP | measured | RIPEstat |
 | internet | Google peers directly with most large ISPs | sourced | Chiu et al., IMC 2015 (> 60% of prefixes) |
 | google | ECMP; Maglev (consistent hashing) for web traffic | sourced | Maglev, NSDI 2016 |
+| google | Maglev: every machine builds the same lookup table; changing backends moves few connections | sourced | Maglev, NSDI 2016 |
 | google | what answers ICMP for a VIP | not public | prose says so |
 | google | echo reply: type 0, swap, echo id/seq/data | sourced | RFC 792 |
 | return | asymmetric routing; via Greenville | sourced / scenario | Paxson 1997 |
