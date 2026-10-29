@@ -150,7 +150,7 @@ class EdgeScene implements Scene {
     this.label("ecmp", [-5.2, 1.4, laneZ(LANES - 1) + 0.6], "equal-cost paths: hash picks one", {
       opacity: win(b, -0.3, 0.0, 0.8, 1.1),
     });
-    this.label("lb", [LB_X, 1.45, laneZ(0) - 0.7], "load balancers (Maglev)", {
+    this.label("lb", [LB_X, 1.45, laneZ(0) - 0.7], "load balancers (Maglev, for web traffic)", {
       kind: "name",
       align: "center",
       opacity: ramp(b, 0.3, 0.7),
@@ -247,7 +247,7 @@ class EdgeScene implements Scene {
     const route = seg(b, 1.7, 2.3);
 
     this.router(C.claude, arrive >= 1 ? 0.5 : 0.2);
-    this.label("router", [ROUTER[0], 1.6, ROUTER[2]], "TLS ends here", {
+    this.label("router", [ROUTER[0], 1.6, ROUTER[2]], "Cloudflare: TLS ends here", {
       kind: "name",
       align: "center",
       color: CSS.claude,

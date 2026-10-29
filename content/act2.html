@@ -30,8 +30,8 @@
   </div>
   <div class="card">
     <h3>Before your words</h3>
-    <p>Most of it is there before you type anything. The system prompt explains how Claude Code works and what it can do on your machine. Every tool (running commands, reading and editing files, searching, starting subagents, your MCP tools) comes with a description and a JSON Schema for its inputs. Your CLAUDE.md files and a few facts about your environment go in too. Together that's typically tens of thousands of tokens.</p>
-    <p class="note">A token is the unit the model reads: a short word, a piece of a longer one, punctuation. English averages about four characters per token.</p>
+    <p>Most of it is there before you type anything. The system prompt explains how Claude Code works and what it can do on your machine. Every built-in tool (running commands, reading and editing files, searching, starting subagents) comes with a description and a JSON Schema for its inputs; your MCP tools go in as names until Claude needs one. Your CLAUDE.md files, saved memory and a few facts about your environment go in too. Together that's typically tens of thousands of tokens.</p>
+    <p class="note">A token is the unit the model reads: a short word, a piece of a longer one, punctuation. For Claude, an English token averages about three characters; the exact count depends on the model.</p>
   </div>
   <div class="card">
     <h3>Your message</h3>
@@ -39,14 +39,14 @@
   </div>
   <div class="card">
     <h3>Marked for reuse</h3>
-    <p>The start of the request is identical every time: same tools, same system prompt. Claude Code marks where that stable part ends (a cache breakpoint), and the API keeps the work it did on that prefix for 5 minutes by default, or an hour when asked. Any byte that changes before the breakpoint means starting over, so the order is fixed: tools, then system prompt, then messages.</p>
+    <p>Most of the request matches one Claude Code sent recently: the same tools, system prompt and project files, and on later turns the whole conversation so far. Claude Code marks where that matching start ends (a cache breakpoint), and the API keeps the work it did on it for 5 minutes, or an hour, which Claude Code asks for on a subscription. The API reads it in a fixed order, tools, then system prompt, then messages, and one changed byte means starting over from there.</p>
   </div>
 </section>
 
 <section class="chapter" id="wire" data-chapter="wire">
   <div class="card">
     <h2>Over the wire</h2>
-    <p>Act I again, mostly. The name is <code>api.anthropic.com</code> and DNS answers <code>160.79.104.10</code>, an address in a block Anthropic announces from its own network, AS399358. If Claude Code doesn't have a connection open already, it opens one: a TCP handshake (one round trip), then TLS 1.3 (one more), which agrees on encryption keys and checks the server's certificate.</p>
+    <p>Act I again, mostly. The name is <code>api.anthropic.com</code> and DNS answers <code>160.79.104.10</code>, an address in a block registered to Anthropic (AS399358) and reached through Cloudflare's network. If Claude Code doesn't have a connection open already, it opens one: a TCP handshake (one round trip), then TLS 1.3 (one more), which agrees on encryption keys and checks the server's certificate.</p>
   </div>
   <div class="card">
     <h3>The request</h3>
@@ -61,11 +61,11 @@
 <section class="chapter" id="frontdoor" data-chapter="frontdoor">
   <div class="card">
     <h2>The front door</h2>
-    <p>The first machines to touch the request end the encrypted connection and spread requests across the servers behind them. So far this is the same as any large web service.</p>
+    <p>The first machines to touch the request are Cloudflare's, at a site near you. They end the encrypted connection and pass the request on toward Anthropic's servers. So far this is the same as many large web services.</p>
   </div>
   <div class="card">
     <h3>Who's asking</h3>
-    <p>The request carries a credential: an API key, or for a Claude subscription, the OAuth token Claude Code got when you logged in. The API checks it, looks up the limits that apply to your account (requests and tokens per minute), and keeps count for billing.</p>
+    <p>The request carries a credential: an API key, or for a Claude subscription, the OAuth token Claude Code got when you logged in. The API checks it, looks up the limits that apply to you (requests and tokens per minute for an API key, a five-hour and a weekly allowance for a subscription), and keeps count.</p>
   </div>
   <div class="card">
     <h3>Where to run it</h3>
@@ -80,7 +80,7 @@
   </div>
   <div class="card">
     <h3>A server</h3>
-    <p>Several chips share a server, joined by links much faster than ordinary networking so they can work almost as one. A model like Claude doesn't fit in one chip's memory. Its weights, the numbers learned in training, are split across many chips, and each does part of every calculation and trades partial results with the others.</p>
+    <p>Several chips share a server, joined by links much faster than ordinary networking so they can work almost as one. A frontier model is generally too big for one chip's memory. Its weights, the numbers learned in training, are split across many chips, and each does part of every calculation and trades partial results with the others.</p>
   </div>
   <div class="card">
     <h3>Racks, rows, halls</h3>
@@ -88,7 +88,7 @@
   </div>
   <div class="card">
     <h3>A campus</h3>
-    <p>Anthropic runs Claude on three kinds of chips: Google's TPUs, Amazon's Trainium and NVIDIA's GPUs. The numbers are large. In October 2025 Anthropic announced access to up to a million TPUs, with well over a gigawatt of capacity coming online in 2026. Amazon's Project Rainier, which Anthropic uses to build and run Claude, has nearly half a million Trainium2 chips. A gigawatt is roughly the output of a large power plant.</p>
+    <p>Anthropic runs Claude on three kinds of chips: Google's TPUs, Amazon's Trainium and NVIDIA's GPUs. The numbers are large. In October 2025 Anthropic announced access to up to a million TPUs, with well over a gigawatt of capacity coming online in 2026. Amazon's Project Rainier, which Anthropic uses to build and run Claude, opened in October 2025 with nearly half a million Trainium2 chips. A gigawatt is roughly the output of a large power plant.</p>
   </div>
 </section>
 
@@ -103,7 +103,7 @@
   </div>
   <div class="card">
     <h3>Mostly from cache</h3>
-    <p>As it goes, each layer saves two vectors per token, a key and a value, for later tokens to look back at. That's the KV cache. For the cached prefix of your request those already exist from a recent request, so only the new part runs: your message, and anything else after the breakpoint. That's a big part of why a reply can start in about a second.</p>
+    <p>As it goes, each layer saves two vectors per token, a key and a value, for later tokens to look back at. That's the KV cache. For the cached prefix of your request those already exist from a recent request, so only the new part runs: your message, and anything else after the breakpoint. That's a big part of why the first token can be ready in about a second.</p>
     <details class="deeper">
       <summary>More detail</summary>
       <div>
@@ -120,7 +120,7 @@
   </div>
   <div class="card">
     <h3>And again</h3>
-    <p>To get the one after it, that token goes back in at the bottom and runs through every layer, looking back at everything before it through the KV cache. One full pass per token, each waiting on the last. This stage is decode. Per token, it's slow work for the chips: each pass reads all of the model's weights from memory for a single new token.</p>
+    <p>To get the one after it, that token goes back in at the bottom and runs through every layer, looking back at everything before it through the KV cache. One full pass per token, each waiting on the last. This stage is decode. Per token, it's slow work for the chips: each pass reads billions of the model's weights from memory for a single new token.</p>
   </div>
   <div class="card">
     <h3>Not alone</h3>
@@ -144,7 +144,7 @@ data: {"type":"content_block_delta","index":1,
     <h3>event: ping</h3>
     <pre class="term">event: ping
 data: {"type": "ping"}</pre>
-    <p>Mixed into the stream are ping events. They carry nothing. They keep the connection from looking idle while the model works, so nothing in between gives up on it. Act I's question shows up again, forty-odd years later, as a heartbeat inside Act II.</p>
+    <p>Mixed into the stream are ping events. They carry nothing. The docs don't say why they're there, but the usual reason is to keep a quiet connection from looking idle, so nothing in between gives up on it. Act I's question shows up again, forty-odd years later, as a heartbeat inside Act II.</p>
   </div>
   <div class="card">
     <h3>On your screen</h3>
@@ -188,7 +188,7 @@ data: {"type": "ping"}</pre>
       <tr><td>Round trips</td><td>one</td><td>two to connect, then one per tool call, often dozens</td></tr>
       <tr><td>Time</td><td>11.8 ms</td><td>seconds per reply, minutes per task</td></tr>
       <tr><td>Work at the far end</td><td>change one byte, fix a checksum</td><td>on the order of 10<sup>15</sup> operations per reply</td></tr>
-      <tr><td>Hardware</td><td>a dozen routers and one server</td><td>the same routers, then a group of accelerators in a building with hundreds of thousands</td></tr>
+      <tr><td>Hardware</td><td>a dozen routers and one server</td><td>the same routers, then a group of accelerators among hundreds of thousands</td></tr>
     </table>
     <p class="note">The far-end numbers are orders of magnitude: model sizes aren't public, and caching changes the total a lot.</p>
   </div>

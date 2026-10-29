@@ -40,6 +40,10 @@ URL parameters for development: `?at=dns:0.5` (jump to a chapter and progress), 
   both come from it.
 - **The globe** (`src/geo/`): land dots from Natural Earth (public domain), rasterised by
   `npm run land` into a 19 KB run-length mask.
+- **Facts** (`docs/fact-check.md`): every claim in the prose and labels, with its source.
+- **Analytics** (`src/analytics.ts`): self-hosted, cookieless Umami at umami.brndn.zip. Pageviews,
+  one `chapter` event per chapter reached, and `no-webgpu` when the page falls back to text. Only
+  ping-viz.brndn.zip reports (the tag's `data-domains`), so dev and screenshots stay silent.
 
 ## Checking visuals without a GPU
 

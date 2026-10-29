@@ -7,7 +7,8 @@ If you change a chapter's card count, change it here, in the content, and in the
 
 Story conventions: Linux laptop on Wi-Fi in a house in Asheville, NC; fiber ISP; cold DNS cache;
 google.com = 172.253.124.113 (ys-in-f113.1e100.net), a Google front end near Atlanta; RTT 11.8 ms.
-Act II: Claude Code (a Bun-compiled native binary), api.anthropic.com = 160.79.104.10 (AS399358).
+Act II: Claude Code (a Bun-compiled native binary), api.anthropic.com = 160.79.104.10 (AS399358,
+reached through Cloudflare, AS13335; TLS ends at Cloudflare's edge). Facts and their sources: docs/fact-check.md.
 
 ## Look
 
@@ -100,7 +101,8 @@ Act II: Claude Code (a Bun-compiled native binary), api.anthropic.com = 160.79.1
 ### google (edge) · 3 cards · 44.7 → 44.72 ms
 0. The edge: Google's routers spread traffic over many equal-cost paths by hashing addresses (ECMP).
 1. Load balancers and front ends: Maglev, Google's software load balancer, spreads connections
-   across front ends; the machine holding the address answers ping.
+   across front ends (for web traffic; Google doesn't say what answers ICMP); a machine answering
+   for the address replies.
 2. The reply: type 8 becomes 0, source and destination swap, the rest is echoed, checksum redone,
    sent back (mint from here on).
 
@@ -139,15 +141,17 @@ Act II: Claude Code (a Bun-compiled native binary), api.anthropic.com = 160.79.1
 ### prompt (context) · 4 cards · 0 → 4 ms
 0. What gets sent: one JSON request: model, system prompt, tools, messages, settings, stream: true.
 1. Before your words: the system prompt and the tool definitions (JSON Schemas), CLAUDE.md,
-   environment: tens of thousands of tokens. The wall stacks them in request order: tools, system
-   prompt (environment facts are part of it), then the first message (skills, CLAUDE.md and memory,
-   your words).
+   environment: tens of thousands of tokens. MCP tools go in as names (deferred). The wall stacks
+   them in request order (Claude Code prompt-caching docs): tools, system prompt, CLAUDE.md and
+   memory, then the conversation, which opens with the environment (directory, platform, git
+   status) and the skills list, then your words.
 2. Your message: the thin layer on top; often around 1% of the first request.
-3. Reusable: cache breakpoints after the stable prefix; the server keeps that prefix's work for a
-   few minutes (5 by default, 1 hour on request) and reuses it.
+3. Reusable: most of the request matches a recent one (same tools, system prompt, project files;
+   later turns the whole conversation). A cache breakpoint marks the end of the match; the API keeps
+   its work 5 minutes, or 1 hour (Claude Code asks for the hour on a subscription).
 
 ### wire (globe) · 3 cards · 4 → 70 ms
-0. DNS (cached) → 160.79.104.10, Anthropic's own network (AS399358); TCP and TLS 1.3 handshakes
+0. DNS (cached) → 160.79.104.10, Anthropic's block (AS399358) reached via Cloudflare; TCP and TLS 1.3 handshakes
    unless a connection is already open.
 1. The body: ~100 KB in ~70 TCP segments; slow start (about 14 KB in the first round trip, doubling).
    An HTTPS POST /v1/messages, stream: true.
@@ -155,8 +159,9 @@ Act II: Claude Code (a Bun-compiled native binary), api.anthropic.com = 160.79.1
    encrypted bytes); routers read only the headers. Arrival at the front door.
 
 ### frontdoor (edge) · 3 cards · 70 → 85 ms
-0. TLS ends; load balancers.
-1. Who's asking: API key or OAuth token; rate limits; usage.
+0. Cloudflare's edge, near you: TLS ends; the request goes on toward Anthropic's servers.
+1. Who's asking: API key or OAuth token; limits (per minute for API keys, 5-hour and weekly for
+   subscriptions); usage.
 2. Where to run it: a deployment of the model with room; maybe a short queue.
 
 ### datacenter (datacenter) · 4 cards · 85 → 90 ms

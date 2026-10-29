@@ -171,7 +171,7 @@ export function buildEcho(s: EchoSpec): Frame {
       length: 2,
       value: String(s.ipId),
       note: s.dontFragment
-        ? "Only used to reassemble fragments; Linux leaves it 0 when fragmenting isn't allowed."
+        ? "Only used to reassemble fragments; Linux leaves it 0 here: Don't Fragment is set and ping's socket isn't tied to one address."
         : "Only used to reassemble fragments.",
     },
     {
@@ -322,7 +322,7 @@ export const REQUEST = buildEcho({
   linkNotes: { dst: "The router's hardware address: the next hop, not Google.", src: "This laptop's Wi-Fi card." },
 });
 
-/** The same packet leaving the router: public source address, TTL one lower, both checksums redone. */
+/** The same packet leaving the router: public source address, TTL one lower, IP checksum redone (the ICMP checksum doesn't cover addresses). */
 export const AFTER_NAT = buildEcho({
   dstMac: [0x00, 0x00, 0x5e, 0x00, 0x53, 0x90],
   srcMac: [0x00, 0x00, 0x5e, 0x00, 0x53, 0x02],

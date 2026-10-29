@@ -14,8 +14,8 @@ import type { Vec3 } from "../util/math";
 import type { Label, Scene, SceneFactory, SceneFrame } from "./scene";
 
 const R = 6;
-/** Context column height per token (200k tokens ≈ 8 units). */
-const PER_TOKEN = 1 / 25_000;
+/** Context column height per token (1M tokens, the default window on current models, = 8 units). */
+const PER_TOKEN = 1 / 125_000;
 const LAPTOP: Vec3 = [-R, 0, 0];
 const MODEL: Vec3 = [R, 0, 0];
 
@@ -45,16 +45,16 @@ interface Lap {
   compacted: boolean;
 }
 
-/** A deterministic session: ~45 laps, compacted once when it passes ~150k tokens. */
+/** A deterministic session: 48 laps of file reads and test runs, compacted once when it passes ~900k tokens. */
 const LAPS: Lap[] = (() => {
   const out: Lap[] = [];
   let total = 23_000;
   let compacted = false;
   for (let i = 0; i < 48; i++) {
     const reply = 300 + ((i * 137) % 500);
-    const result = i === 0 ? 400 : 1_200 + ((i * 911) % 4_200);
+    const result = i === 0 ? 400 : 10_000 + ((i * 9_011) % 32_000);
     let didCompact = false;
-    if (!compacted && total > 150_000) {
+    if (!compacted && total > 900_000) {
       total = 34_000;
       compacted = true;
       didCompact = true;
@@ -318,7 +318,7 @@ class LoopScene implements Scene {
     }
     // The model's context window, as a glass column the stack fills: it nears the top, then compacts.
     if (fast > 0.01) {
-      const lim = 200_000 * PER_TOKEN;
+      const lim = 1_000_000 * PER_TOKEN;
       const s = w / 2 + 0.15;
       const foot: Vec3[] = [
         [x - s, 0, z - s],

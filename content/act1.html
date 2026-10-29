@@ -55,7 +55,7 @@
   <div class="card">
     <h3>fork</h3>
     <p>To run a program, Unix first copies the process that wants to run it. bash calls <code>fork()</code> (on Linux, the <code>clone</code> system call) and the kernel makes a second bash: same memory, same open files, new process ID.</p>
-    <p>Nothing is actually copied yet. Both processes share the same memory pages, marked read-only, and the kernel copies a page only when one of them writes to it.</p>
+    <p>The memory isn't actually copied yet. Both processes share the same memory pages, marked read-only, and the kernel copies a page only when one of them writes to it.</p>
   </div>
   <div class="card">
     <h3>exec</h3>
@@ -64,7 +64,7 @@
     <details class="deeper">
       <summary>More detail</summary>
       <div>
-        <p>Why copy and then replace, instead of one call? The child can change things in between: point its output at a file, join a pipe, move to another directory. That gap is how <code>ping google.com &gt; out.txt</code> works. When nothing needs changing, Linux also offers <code>posix_spawn</code> and <code>vfork</code>, which skip most of the copying.</p>
+        <p>Why copy and then replace, instead of one call? The child can change things in between: point its output at a file, join a pipe, move to another directory. That gap is how <code>ping google.com &gt; out.txt</code> works. Linux systems also offer <code>vfork</code> and <code>posix_spawn</code>, which skip most of the copying; <code>posix_spawn</code> takes a list of redirections to make in between.</p>
       </div>
     </details>
   </div>
@@ -87,11 +87,11 @@
   </div>
   <div class="card">
     <h3>Ask Google</h3>
-    <p>Google's own nameserver answers: <code>google.com A 172.253.124.113</code>, good for 300 seconds. Google hands out different addresses depending on where the question comes from, so this one is a front end near Atlanta, a few hundred kilometres from the house.</p>
+    <p>Google's own nameserver answers with six addresses, each good for 300 seconds, and ping takes the first: <code>172.253.124.113</code>. Google hands out different addresses depending on where the question comes from, so this one is a front end near Atlanta, a few hundred kilometres from the house.</p>
     <p>Every layer caches what it learned on the way back, and ping prints its first line:</p>
     <pre class="term"><span class="ps">$</span> ping google.com
 PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
-    <p class="note">This was the slow path. Usually a cache somewhere along the way already has the answer and the lookup takes well under a millisecond.</p>
+    <p class="note">This was the slow path. Usually a cache already has the answer: the one on your laptop in well under a millisecond, or your ISP's in a few milliseconds.</p>
     <details class="deeper">
       <summary>More detail</summary>
       <div>
@@ -120,13 +120,13 @@ PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
   </div>
   <div class="card">
     <h3>Out of the machine</h3>
-    <p>The frame joins a queue (the queueing discipline, which keeps one busy program from starving the others), and the Wi-Fi driver points the network card at it in memory. The card copies it out on its own and takes it from there.</p>
+    <p>The frame joins a queue (Linux's Wi-Fi layer keeps one for each device it talks to, so one busy program can't starve the others), and the driver points the network card at it in memory. The card copies it out on its own and takes it from there.</p>
     <p>From <code>sendto()</code> to the card: a few tens of microseconds. The send time is already in the data; ping wrote it there just before.</p>
     <details class="deeper">
       <summary>More detail</summary>
       <div>
         <p>The Internet checksum is a one's-complement sum of the header's 16-bit words. It's cheap enough that every router updates it after changing the time to live. ICMP has its own checksum over the ICMP header and data.</p>
-        <p>The IP identification field is 0 because the Don't Fragment flag is set: nothing will be split, so nothing needs reassembling. 56 data bytes is ping's default because 56 + 8 = 64.</p>
+        <p>The IP identification field only matters for putting split packets back together. Linux leaves it 0 here: the Don't Fragment flag is set and ping's socket isn't tied to one address. 56 data bytes is ping's default because 56 + 8 = 64.</p>
       </div>
     </details>
   </div>
@@ -135,7 +135,7 @@ PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
 <section class="chapter" id="wifi" data-chapter="wifi">
   <div class="card">
     <h2>Into the air</h2>
-    <p>The Wi-Fi driver swaps the Ethernet header for an 802.11 header, which carries three hardware addresses instead of two, plus a short header saying the payload is IPv4. Then the card encrypts the payload with the key the laptop agreed on with the router when it joined the network (WPA2 or WPA3, both AES).</p>
+    <p>Before the card fetches the frame, Linux's Wi-Fi layer swaps the Ethernet header for an 802.11 header, which carries three hardware addresses instead of two, plus a short header saying the payload is IPv4. Then the card encrypts the payload with the key the laptop agreed on with the router when it joined the network (WPA2 or WPA3, both AES).</p>
   </div>
   <div class="card">
     <h3>Waiting its turn</h3>
@@ -185,7 +185,7 @@ PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
   </div>
   <div class="card">
     <h3>Google's network</h3>
-    <p>The ISP hands the packet to Google in Atlanta, and Google's own fiber carries it the rest of the way to the front end that owns the address. Google connects directly to most large ISPs, close to their customers, so the trip rarely crosses anyone else's network.</p>
+    <p>The ISP hands the packet to Google in Atlanta, and Google's own fiber carries it the rest of the way to the front end that owns the address. Google connects directly to most large ISPs, close to their customers, so the trip usually doesn't cross anyone else's network.</p>
     <p>About 5 milliseconds after leaving the house, it arrives.</p>
     <details class="deeper">
       <summary>More detail</summary>
@@ -203,7 +203,7 @@ PING google.com (172.253.124.113) 56(84) bytes of data.</pre>
   </div>
   <div class="card">
     <h3>Load balancers</h3>
-    <p>For web traffic the next layer is Maglev, Google's software load balancer: a fleet of ordinary servers that spread connections across the front ends, using consistent hashing so any of them sends a connection's packets to the same place. A ping needs less than that. One of the machines answering for 172.253.124.113 receives the echo request.</p>
+    <p>For web traffic the next layer is Maglev, Google's software load balancer: a fleet of ordinary servers that spread connections across the front ends, using consistent hashing so any of them sends a connection's packets to the same place. Google doesn't say which machines answer pings. Some machine answering for 172.253.124.113 receives the echo request.</p>
   </div>
   <div class="card">
     <h3>The reply</h3>

@@ -1,8 +1,8 @@
 // The prompt chapter: what Claude Code actually sends, drawn as a wall of tokens.
 //
 // One glowing tile per token (~22,800 of them), laid out like wrapped text: left to right, bottom to
-// top, coloured by section in the order the API renders them (tools, system prompt, skills, CLAUDE.md
-// and memory, environment, then your message). The tiles live on the GPU (context-wall.wgsl): this
+// top, coloured by section in the order the API renders them (tools, system prompt, CLAUDE.md and
+// memory, environment, skills, then your message). The tiles live on the GPU (context-wall.wgsl): this
 // file owns the timeline, the camera, the labels and the few guide lines, and hands the shader a
 // handful of numbers per frame. Counts are illustrative, so every label says "≈".
 //
@@ -40,8 +40,9 @@ interface Section {
 
 const SKILLS: Rgb = mixRgb(C.system, [0.8, 0.55, 1.0], 0.45);
 
-// In request order. The environment facts are part of Claude Code's system prompt; CLAUDE.md, memory and
-// the skills list ride along at the start of the first message, ahead of your words.
+// In request order (code.claude.com/docs/en/prompt-caching): tool definitions and the system prompt,
+// then project context (CLAUDE.md, memory), then the conversation, which opens with the environment
+// (directory, platform, git status) and the skills list, ahead of your words.
 const SECTIONS: readonly Section[] = [
   {
     name: "tools",
@@ -61,17 +62,17 @@ const SECTIONS: readonly Section[] = [
     css: CSS.system,
     gain: 0.5,
   },
+  { name: "CLAUDE.md and memory", short: "memory", count: 2500, color: C.memory, css: CSS.memory, gain: 0.52 },
   {
     name: "environment",
     short: "env",
-    note: "directory, platform, date",
+    note: "directory, platform, git status",
     count: 600,
     color: C.history,
     css: CSS.history,
     gain: 0.5,
   },
   { name: "skills and plugins", short: "skills", count: 1500, color: SKILLS, css: "#bfaeff", gain: 0.5 },
-  { name: "CLAUDE.md and memory", short: "memory", count: 2500, color: C.memory, css: CSS.memory, gain: 0.52 },
   { name: "your message", short: "message", count: 200, color: C.prompt, css: CSS.prompt, gain: 2.4 },
 ];
 
@@ -150,9 +151,9 @@ const SLOTS = {
 const BUILD: readonly (readonly [number, number, number])[] = [
   [0.28, 0.86, ENDS[0] as number],
   [0.86, 1.06, ENDS[1] as number],
-  [1.06, 1.13, ENDS[2] as number],
-  [1.13, 1.26, ENDS[3] as number],
-  [1.26, 1.43, ENDS[4] as number],
+  [1.06, 1.23, ENDS[2] as number],
+  [1.23, 1.3, ENDS[3] as number],
+  [1.3, 1.43, ENDS[4] as number],
 ];
 
 function tokensAt(b: number): number {

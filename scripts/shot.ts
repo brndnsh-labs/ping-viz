@@ -44,7 +44,7 @@ try {
   page.on("pageerror", (e) => errors.push(String(e)));
   const extra = args.get("param");
   await page.goto(`${server.url}/?shot${extra ? `&${extra}` : ""}`);
-  await page.waitForFunction(() => window.__ping?.ready === true, undefined, { timeout: 120_000, polling: 250 });
+  await page.waitForFunction(() => window.__ping?.ready === true, undefined, { timeout: 600_000, polling: 250 });
   const gpu = await page.evaluate(() => window.__ping?.gpu);
   if (gpu !== "ok") console.log(`  WebGPU: ${gpu}`);
   const chapters = await page.evaluate(() => window.__ping?.chapters ?? []);

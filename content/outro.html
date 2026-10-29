@@ -9,7 +9,7 @@
     <ul>
       <li>The house, the route and the timings are one plausible run. The addresses inside the house are ordinary private ones (RFC 1918). Its public address and the hardware addresses come from ranges reserved for documentation (RFC 5737, RFC 7042). google.com's address and name are real, from a lookup in October 2026.</li>
       <li>The packet bytes are exact: checksums and all, as Linux's ping would send them.</li>
-      <li>Everything about Anthropic's infrastructure is public: the chip platforms and capacity are from Anthropic's and Amazon's announcements. The places on the globe in Act II and the datacenter and model pictures are illustrations, not locations, floor plans or architecture diagrams.</li>
+      <li>Everything about Anthropic's infrastructure is public: the chip platforms and capacity are from Anthropic's and Amazon's announcements. The address, network and front door are from DNS, BGP and the API's own response headers, in October 2026. The datacenter on the globe sits at Project Rainier's public site in New Carlisle, Indiana; the datacenter and model pictures are illustrations, not floor plans or architecture diagrams.</li>
     </ul>
     <h3>Sources</h3>
     <ul class="sources">
@@ -20,6 +20,9 @@
       <li><a href="https://platform.claude.com/docs/en/build-with-claude/streaming">Streaming messages</a> and <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching">prompt caching</a>, Claude API docs</li>
       <li><a href="https://www.anthropic.com/news/expanding-our-use-of-google-cloud-tpus-and-services">Expanding our use of Google Cloud TPUs</a> (October 2025) and <a href="https://www.anthropic.com/news/google-broadcom-partnership-compute">the Google and Broadcom compute partnership</a> (April 2026), Anthropic</li>
       <li><a href="https://www.aboutamazon.com/news/aws/aws-project-rainier-ai-trainium-chips-compute-cluster">Project Rainier</a>, Amazon: the Trainium2 count</li>
+      <li><a href="https://code.claude.com/docs/en/how-claude-code-works">How Claude Code works</a> and <a href="https://code.claude.com/docs/en/prompt-caching">how it uses prompt caching</a>, Claude Code docs: what goes into a request, and in what order</li>
+      <li><a href="https://platform.claude.com/docs/en/api/rate-limits">Rate limits</a> and <a href="https://platform.claude.com/docs/en/about-claude/glossary">the glossary</a> (characters per token), Claude API docs</li>
+      <li><a href="https://arxiv.org/abs/2001.08361">Scaling Laws for Neural Language Models</a>, Kaplan et al. 2020: about two operations per parameter per token</li>
     </ul>
     <p class="note"><a href="https://brndn.zip">brndn.zip</a></p>
   </div>

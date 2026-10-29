@@ -1,4 +1,5 @@
 import "./ui/style.css";
+import { trackChapters, trackNoGpu } from "./analytics";
 import { App } from "./app";
 import { GpuUnavailableError, gpuErrors, initGpu } from "./gpu/context";
 import type { SceneId } from "./scenes/scene";
@@ -49,9 +50,11 @@ const debug: PingDebug = {
 };
 window.__ping = debug;
 
-initContent(document.getElementById("story") as HTMLElement, (focus) => {
+const story = document.getElementById("story") as HTMLElement;
+initContent(story, (focus) => {
   if (app) app.focus = focus;
 });
+trackChapters(story);
 
 let app: App | null = null;
 
@@ -65,6 +68,7 @@ function fallback(reason: string): void {
   }
   debug.gpu = reason;
   debug.ready = true;
+  trackNoGpu(reason);
 }
 
 async function boot(): Promise<void> {
