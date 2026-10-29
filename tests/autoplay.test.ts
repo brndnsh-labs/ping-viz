@@ -27,8 +27,12 @@ describe("autoplay pacing", () => {
 
   it("adds slow-part bonuses and scales by data-dwell, but never the settle", () => {
     expect(dwellSeconds({ words: 0, bonus: 10, factor: 1 }, 1)).toBeCloseTo(10 + SETTLE_S);
-    expect(dwellSeconds({ words: 90, bonus: 10, factor: 1.5 }, 1)).toBeCloseTo((30 + 10) * 1.5 + SETTLE_S);
-    expect(dwellSeconds({ words: 90, bonus: 10, factor: 1.5 }, 2)).toBeCloseTo(((30 + 10) * 1.5) / 2 + SETTLE_S);
+    expect(dwellSeconds({ words: WORDS_PER_MINUTE / 2, bonus: 10, factor: 1.5 }, 1)).toBeCloseTo(
+      (30 + 10) * 1.5 + SETTLE_S,
+    );
+    expect(dwellSeconds({ words: WORDS_PER_MINUTE / 2, bonus: 10, factor: 1.5 }, 2)).toBeCloseTo(
+      ((30 + 10) * 1.5) / 2 + SETTLE_S,
+    );
   });
 
   it("glides for longer over longer distances, within limits", () => {
@@ -58,6 +62,18 @@ describe("autoplay stops", () => {
     const s = stopFor(2000, 3200, v);
     expect(s.from).toBe(2000 - 80);
     expect(s.to).toBe(3200 - (800 - 16));
+    expect(s.tall).toBe(true);
+  });
+
+  it("drifts from before a short card's centre to after it, keeping the card on screen", () => {
+    const s = stopFor(2000, 2200, v, { back: 100, fwd: 150 });
+    expect(s.from).toBe(1700 - 100);
+    expect(s.to).toBe(1700 + 150);
+    expect(s.tall).toBeFalsy();
+    // A big drift is cut short where the card would leave the screen.
+    const big = stopFor(2000, 2200, v, { back: 5000, fwd: 5000 });
+    expect(big.from).toBe(2200 - (800 - 16));
+    expect(big.to).toBe(2000 - 80);
   });
 
   it("stays within the page", () => {

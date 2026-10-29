@@ -7,13 +7,18 @@ import { clamp } from "../util/math";
 
 // ---- Pacing (pure, tested in tests/autoplay.test.ts) -----------------------------------------
 
-export const WORDS_PER_MINUTE = 180;
+export const WORDS_PER_MINUTE = 240;
 /** Added to every card at any speed: time for the scene to arrive before the reader looks up. */
-export const SETTLE_S = 2;
+export const SETTLE_S = 1.5;
 export const SPEEDS = [0.75, 1, 1.5, 2] as const;
 const GLIDE_MIN_S = 1.2;
 const GLIDE_MAX_S = 2.5;
 const GLIDE_PER_SCREEN_S = 0.6;
+/**
+ * While a card is up, the page creeps from this fraction of the way back toward the previous card to
+ * the same fraction toward the next, so the scene keeps moving slowly behind the text.
+ */
+export const DRIFT = 0.2;
 
 /**
  * Parts of a card that take longer than their word count says. Each match adds `seconds` of reading
@@ -55,12 +60,20 @@ export function glideSeconds(distance: number, viewportH: number): number {
 
 /**
  * Where to hold for one card, as scroll offsets: `from` on arrival, `to` by the end of the dwell.
- * Normally both put the card's centre on the reading line, nudged so the whole card is on screen
- * (below the HUD). A card taller than the screen starts with its top in view and pans to its bottom.
+ * Normally the card's centre sits near the reading line and the page drifts slowly from a little
+ * before it to a little after (never cutting the card off). A card taller than the screen starts with
+ * its top in view and pans to its bottom (`tall`).
  */
 export interface Stop {
   from: number;
   to: number;
+  tall?: boolean;
+}
+
+/** px to drift before and after a card's centre. */
+export interface Drift {
+  back: number;
+  fwd: number;
 }
 
 export interface Viewport {
@@ -73,16 +86,16 @@ export interface Viewport {
   insetBottom: number;
 }
 
-export function stopFor(top: number, bottom: number, v: Viewport): Stop {
+export function stopFor(top: number, bottom: number, v: Viewport, drift: Drift = { back: 0, fwd: 0 }): Stop {
   const ideal = (top + bottom) / 2 - v.height * v.line;
   const showsBottom = bottom - (v.height - v.insetBottom);
   const showsTop = top - v.insetTop;
   const onPage = (y: number): number => clamp(y, 0, Math.max(0, v.maxScroll));
   if (showsBottom <= showsTop) {
-    const y = onPage(clamp(ideal, showsBottom, showsTop));
-    return { from: y, to: y };
+    const onScreen = (y: number): number => onPage(clamp(y, showsBottom, showsTop));
+    return { from: onScreen(ideal - drift.back), to: onScreen(ideal + drift.fwd) };
   }
-  return { from: onPage(showsTop), to: onPage(showsBottom) };
+  return { from: onPage(showsTop), to: onPage(showsBottom), tall: true };
 }
 
 /** The first card whose stop is at or after scroll offset y (within `tol` px behind it), or -1. */
@@ -113,7 +126,7 @@ export function cardCost(card: HTMLElement): CardCost {
 
 type Phase =
   | { kind: "glide"; k: number; from: number; t: number; dur: number }
-  | { kind: "dwell"; k: number; a: number; b: number; done: number; cost: CardCost };
+  | { kind: "dwell"; k: number; a: number; b: number; tall: boolean; done: number; cost: CardCost };
 
 const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
 
@@ -157,9 +170,23 @@ export function initAutoplay(o: AutoplayOptions): void {
       insetBottom: 16 + (o.note && !o.note.hidden ? o.note.offsetHeight + 8 : 0),
     };
     cards = [...o.story.querySelectorAll<HTMLElement>("section[data-chapter] > .card")];
-    stops = cards.map((c) => {
+    const boxes = cards.map((c) => {
       const r = c.getBoundingClientRect();
-      return stopFor(r.top + window.scrollY, r.bottom + window.scrollY, v);
+      return { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY };
+    });
+    const mid = (k: number): number | null => {
+      const b = boxes[k];
+      return b ? (b.top + b.bottom) / 2 : null;
+    };
+    const drift = o.reducedMotion ? 0 : DRIFT;
+    stops = boxes.map((b, k) => {
+      const c = mid(k) as number;
+      const prev = mid(k - 1);
+      const next = mid(k + 1);
+      return stopFor(b.top, b.bottom, v, {
+        back: prev === null ? 0 : (c - prev) * drift,
+        fwd: next === null ? 0 : (next - c) * drift,
+      });
     });
     dirty = false;
   }
@@ -190,7 +217,7 @@ export function initAutoplay(o: AutoplayOptions): void {
       stopPlaying();
       return;
     }
-    phase = { kind: "dwell", k, a: from, b: Math.max(from, stop.to), done: 0, cost: cardCost(card) };
+    phase = { kind: "dwell", k, a: from, b: Math.max(from, stop.to), tall: !!stop.tall, done: 0, cost: cardCost(card) };
   }
 
   function play(): void {
@@ -258,8 +285,15 @@ export function initAutoplay(o: AutoplayOptions): void {
       if (p >= 1) dwell(phase.k, to);
     } else if (phase?.kind === "dwell") {
       phase.done += dt / dwellSeconds(phase.cost, speed());
-      // Tall cards pan through the middle of the dwell; reduced motion steps instead.
-      const pan = o.reducedMotion ? (phase.done < 0.5 ? 0 : 1) : smooth(clamp((phase.done - 0.15) / 0.7, 0, 1));
+      // Short cards drift at a steady pace for the whole dwell. Tall cards pan through the middle of
+      // it; reduced motion steps instead (and has no drift).
+      const pan = o.reducedMotion
+        ? phase.done < 0.5
+          ? 0
+          : 1
+        : phase.tall
+          ? smooth(clamp((phase.done - 0.15) / 0.7, 0, 1))
+          : Math.min(1, phase.done);
       y = phase.a + (phase.b - phase.a) * pan;
       if (phase.done >= 1) {
         if (phase.k + 1 >= stops.length) {
