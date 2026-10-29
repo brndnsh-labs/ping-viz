@@ -52,6 +52,7 @@ live on the date above).
 | arrive | NAPI; recvmsg with timeout; SO_TIMESTAMP | sourced | docs.kernel.org/networking/napi.html; iputils |
 | print | reverse lookup unless -n; 1e100 = googol | sourced | iputils; Google FAQ |
 | print | 16.7 ms frame at 60 Hz; ~200 ms to notice | estimate | display timing; visual reaction time |
+| print | timeline figure: every step to scale, 0 to 75 ms | scenario | drawn from the chapter clocks in `src/story/chapters.ts` (same numbers as the HUD clock) |
 | outro | Muuss, December 1983, the quote, sonar | sourced | ftp.arl.army.mil/~mike/ping.html |
 
 ## Act II
@@ -82,6 +83,7 @@ live on the date above).
 | decode | thinking first; returned at most as a summary; dozens of tokens/s | sourced / estimate | thinking docs; typical speeds |
 | stream | SSE events, `content_block_delta`, `ping` events | sourced | streaming docs |
 | stream | why pings exist | not documented | prose says so |
+| stream | timeline figure: Enter to the end of the reply, 0 to 14 s | scenario | drawn from the chapter clocks |
 | loop | tool_use / stop_reason; tool runs locally; permission check | sourced | tool-use docs; how-claude-code-works |
 | loop | 1M context window by default; compaction near it; subagents own context | sourced | code.claude.com/docs/en/model-config; how-claude-code-works |
 | scale | ~10^15 operations per reply | estimate | Kaplan 2N × hypothetical size × reply length |

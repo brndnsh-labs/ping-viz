@@ -20,7 +20,9 @@ Safari 26+, Chrome or Edge. Without WebGPU the text still reads; the pictures ar
 play button is highlighted and the first tap, click, Enter or Space starts it. URL parameters for
 development: `?at=dns:0.5` (jump to a chapter and progress), `?only=globe`
 (load one scene, the rest are placeholders), `?scale=0.7` (fixed render scale), `?msaa=1`,
-`?dpr=1`, `?shot` (capture mode, used by the scripts).
+`?dpr=1`, `?shot` (capture mode, used by the scripts), `?stats` (frame timing: fps, CPU and GPU
+time per frame, render scale), `?nocap` (draw on every refresh; by default frames are at least
+10 ms apart, so 60 fps on a 120 Hz screen).
 
 ## How it works
 

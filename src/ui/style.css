@@ -776,3 +776,87 @@ details.deeper > div p {
   pointer-events: none;
   white-space: pre;
 }
+
+/* `data-timeline`: chapters to scale on one bar (ui/timeline.ts). */
+.tl {
+  margin: 0.4rem 0 0.2rem;
+  font-variation-settings: "MONO" 1;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-bar {
+  position: relative;
+  display: flex;
+  height: 1.7rem;
+  overflow: hidden;
+  border: 1px solid var(--edge-strong);
+  border-radius: 6px;
+  background: rgba(2, 3, 6, 0.85);
+  touch-action: pan-y;
+}
+
+.tl-seg {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 0.4rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tl-seg.odd {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* How far playback has got; its right edge is the playhead. */
+.tl-fill {
+  position: absolute;
+  inset: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  border-right: 2px solid var(--accent);
+  pointer-events: none;
+}
+
+.tl-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.2rem;
+  color: var(--faint);
+}
+
+.card p.tl-read {
+  min-height: 1.4em;
+  margin: 0.35rem 0 0.45rem;
+  color: var(--ink-soft);
+}
+
+.tl-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tl-buttons button {
+  padding: 0.3rem 0.65rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--edge-strong);
+  border-radius: 6px;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tl-buttons button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tl-buttons button:disabled {
+  color: var(--faint);
+  cursor: default;
+}
