@@ -1653,6 +1653,16 @@ class MachineScene implements Scene {
     this.xrayPts.draw(pass);
   }
 
+  anchor(name: string): CameraPose | null {
+    // Close-up for fly-throughs (story/flights.ts): ping's process, wherever it's drawn this frame (it
+    // moves from where it was exec'd to its place above the socket).
+    if (name === "ping") {
+      const c = this.cellList.find((cell) => cell.id === "child")?.c ?? PING;
+      return P(c[0], c[1], c[2], 1.5, -12, 14, 36);
+    }
+    return null;
+  }
+
   labels(out: Label[]): void {
     out.push(...this.out);
   }

@@ -3,6 +3,7 @@
 import type { SceneId } from "../scenes/scene";
 import { smooth } from "../util/ease";
 import { CHAPTERS, type ChapterDef } from "./chapters";
+import { flightCurves, flightFor } from "./flights";
 import { beatOf, type SectionBox } from "./layout";
 
 /** Half-width of a scene crossfade, in chapters. */
@@ -18,6 +19,8 @@ export interface SlotPlan {
   weight: number;
   /** Camera distance multiplier: the outgoing scene pushes in, the incoming one settles from further back. */
   dolly: number;
+  /** In a fly-through (story/flights.ts): the anchor to zoom toward, and how far into the zoom (0..1). */
+  fly: { anchor: string; s: number } | null;
 }
 
 export interface StoryState {
@@ -37,7 +40,14 @@ const SCENE_ORDINAL: number[] = (() => {
   });
 })();
 
-function slot(i: number, s: number, sections: readonly SectionBox[], weight: number, dolly: number): SlotPlan {
+function slot(
+  i: number,
+  s: number,
+  sections: readonly SectionBox[],
+  weight: number,
+  dolly: number,
+  fly: SlotPlan["fly"] = null,
+): SlotPlan {
   const chapter = CHAPTERS[i] as ChapterDef;
   const p = Math.min(1, Math.max(0, s - i));
   const cards = sections[i]?.cards ?? [];
@@ -50,6 +60,7 @@ function slot(i: number, s: number, sections: readonly SectionBox[], weight: num
     local: (SCENE_ORDINAL[i] as number) + p,
     weight,
     dolly,
+    fly,
   };
 }
 
@@ -73,6 +84,19 @@ export function plan(s: number, sections: readonly SectionBox[]): StoryState {
   }
   if (a < 0) {
     return { index: i, p, chapter: cur, slots: [slot(i, sc, sections, 1, 1)] };
+  }
+  const flight = flightFor((CHAPTERS[a] as ChapterDef).id, (CHAPTERS[a + 1] as ChapterDef).id);
+  if (flight) {
+    const c = flightCurves(t);
+    return {
+      index: i,
+      p,
+      chapter: cur,
+      slots: [
+        slot(a, sc, sections, 1 - c.weight, 1, { anchor: flight.exit, s: c.out }),
+        slot(a + 1, sc, sections, c.weight, 1, { anchor: flight.entry, s: c.in }),
+      ],
+    };
   }
   const w = smooth(Math.min(1, Math.max(0, t)));
   return {

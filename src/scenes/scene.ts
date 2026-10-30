@@ -61,6 +61,11 @@ export interface Scene {
   draw(pass: GPURenderPassEncoder): void;
   /** Labels for this frame (after update). */
   labels(out: Label[]): void;
+  /**
+   * A close-up camera pose on a named point, for fly-throughs between scenes (story/flights.ts).
+   * Called after update(). Null if the scene has no such anchor.
+   */
+  anchor?(name: string): CameraPose | null;
 }
 
 export type SceneFactory = (gfx: Gfx) => Scene;
