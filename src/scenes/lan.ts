@@ -189,6 +189,13 @@ class LanScene implements Scene {
     return cam;
   }
 
+  anchor(name: string): CameraPose | null {
+    // Close-ups for fly-throughs (story/flights.ts): the laptop's lid, where the antenna is; the trunk fiber.
+    if (name === "laptop") return pose([LAPTOP[0], 0.75, LAPTOP[2] - 0.2], 1.4, -10, 22, 40);
+    if (name === "fiber") return pose([26, 0.3, -6], 2.5, -14, 18, 40);
+    return null;
+  }
+
   private furniture(laptopLit: number, phoneLit: number, routerLit: number): void {
     this.device(LAPTOP, [0.9, 0.08, 0.6], C.user, laptopLit);
     this.device([LAPTOP[0], LAPTOP[1] + 0.28, LAPTOP[2] - 0.29], [0.9, 0.55, 0.04], C.user, laptopLit);

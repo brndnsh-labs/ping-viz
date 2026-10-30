@@ -12,9 +12,35 @@ export interface Flight {
 }
 
 export const FLIGHTS: Record<string, Flight> = {
+  // Act I
+  // From the house on the globe down to the key you just pressed.
+  "intro>enter": { exit: "home", entry: "enter-key" },
   // The DNS question leaves ping's process for the world, and the answer comes back to it.
   "fork>dns": { exit: "ping", entry: "home" },
   "dns>packet": { exit: "home", entry: "ping" },
+  // Out through the Wi-Fi antenna, into the room.
+  "packet>wifi": { exit: "antenna", entry: "laptop" },
+  // Down the fiber from the router, out onto the map at home.
+  "router>internet": { exit: "fiber", entry: "home" },
+  // Into Google's front end at Atlanta, and back out.
+  "internet>google": { exit: "google", entry: "entry" },
+  "google>return": { exit: "entry", entry: "google" },
+  // Home, then in through the antenna.
+  "return>arrive": { exit: "home", entry: "antenna" },
+  // Act II
+  // Claude Code's process, then the request it builds.
+  "launch>prompt": { exit: "claude", entry: "request" },
+  // The finished request leaves home.
+  "prompt>wire": { exit: "request", entry: "home" },
+  // Into the API's address on the map, then through the front door.
+  "wire>frontdoor": { exit: "api", entry: "entry" },
+  "frontdoor>datacenter": { exit: "backend", entry: "entry" },
+  // Into one chip, where the model runs.
+  "datacenter>prefill": { exit: "chip", entry: "input" },
+  // The reply leaves the model and heads home.
+  "decode>stream": { exit: "output", entry: "datacenter" },
+  "stream>loop": { exit: "home", entry: "lap" },
+  "loop>scale": { exit: "lap", entry: "home" },
 };
 
 export function flightFor(fromId: string, toId: string): Flight | null {

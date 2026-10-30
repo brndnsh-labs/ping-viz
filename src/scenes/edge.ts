@@ -45,6 +45,9 @@ class EdgeScene implements Scene {
   private readonly points: PointBatch;
   private readonly floor: LineBatch;
   private out: Label[] = [];
+  private act1 = true;
+  private beat = 0;
+  private reply: Vec3 = [-9, 1, -0.7];
 
   constructor(gfx: Gfx) {
     this.solid = new BoxBatch(gfx, "edge-boxes");
@@ -77,7 +80,20 @@ class EdgeScene implements Scene {
     this.out = [];
     this.lines.time = f.time;
     this.floor.time = f.time;
+    this.act1 = f.chapter === "google";
+    this.beat = f.beat;
     return fitNarrow(f.chapter === "google" ? this.google(f) : this.frontdoor(f), f);
+  }
+
+  anchor(name: string): CameraPose | null {
+    // Close-ups for fly-throughs (story/flights.ts): packets arriving at the edge router, the reply
+    // leaving along its path home (Act I, end), the deployment the request is routed to.
+    if (name === "entry") {
+      if (this.act1 && this.beat > 1) return pose(this.reply, 3, -28, 30, 40);
+      return this.act1 ? pose(ROUTER, 3, -60, 24, 40) : pose(ROUTER, 3, -72, 18, 40);
+    }
+    if (name === "backend") return pose([DEPLOY_X + 0.75, 0.9, DEPLOY[CHOSEN]?.z ?? 0], 4, -24, 30, 40);
+    return null;
   }
 
   private label(id: string, pos: Vec3, text: string, opts: Partial<Label> = {}): void {
@@ -222,6 +238,7 @@ class EdgeScene implements Scene {
       pulse: back > 0 && back < 1 ? { at: back, trail: 0.35, intensity: 5 } : undefined,
     });
     if (back > 0 && back < 1) this.head(pointAt(home, back), C.back);
+    this.reply = pointAt(home, 0.8);
 
     return poseAt(
       [

@@ -350,6 +350,17 @@ class DatacenterScene implements Scene {
     return cam;
   }
 
+  anchor(name: string): CameraPose | null {
+    // Close-ups for fly-throughs (story/flights.ts): the grid of multiply-add units the scene opens on,
+    // and the hero chip (once the server is slid home, a light on the rack) at the end of the zoom out.
+    if (name === "entry") return { target: HERO_GRID, distance: 0.006, yaw: 24 * DEG, pitch: 62 * DEG, fov: 40 };
+    if (name === "chip") {
+      const c = add3(L.heroChip(L.HERO.slot, 0), [0, L.DIE_TOP, 0]);
+      return { target: c, distance: 7, yaw: -8 * DEG, pitch: 32 * DEG, fov: 40 };
+    }
+    return null;
+  }
+
   // ---- the hero rack and server ------------------------------------------------------------
 
   private buildNear(b: number, drawer: number, dist: number): void {

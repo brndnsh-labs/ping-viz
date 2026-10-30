@@ -639,9 +639,9 @@ class GlobeScene implements Scene {
   }
 
   anchor(name: string): CameraPose | null {
-    // Close-up for fly-throughs (story/flights.ts): looking down on home from about 150 km.
-    if (name === "home") return pose(ll(P.home.lat, P.home.lon, 1), 0.024, P.home.lon, P.home.lat - 20, 40);
-    return null;
+    // Close-ups for fly-throughs (story/flights.ts): looking down on a place from about 150 km.
+    const place = { home: P.home, google: P.googleAtl, api: API, datacenter: DC }[name];
+    return place ? pose(ll(place.lat, place.lon, 1), 0.024, place.lon, place.lat - 20, 40) : null;
   }
 
   labels(out: Label[]): void {

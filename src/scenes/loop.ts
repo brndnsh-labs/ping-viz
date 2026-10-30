@@ -72,6 +72,8 @@ class LoopScene implements Scene {
   private readonly points: PointBatch;
   private readonly globe: SphereBatch;
   private out: Label[] = [];
+  private beat = 0;
+  private stackTop = 1;
   private showGlobe = 0;
 
   constructor(gfx: Gfx) {
@@ -93,6 +95,7 @@ class LoopScene implements Scene {
     this.out = [];
     this.lines.time = f.time;
     const b = f.beat;
+    this.beat = b;
 
     // Lap position: lap 0 is the reply arriving (b0), then the tool (b1), lap 1 goes out (b2),
     // then a time-lapse through the rest of the session (b3).
@@ -272,6 +275,14 @@ class LoopScene implements Scene {
     return fitNarrow(cam, f, 1.15);
   }
 
+  anchor(name: string): CameraPose | null {
+    // "lap" serves both ends of the chapter (story/flights.ts): your laptop at the start, and at the end
+    // the top of the conversation's stack, where each lap's reply and tool result land.
+    if (name !== "lap") return null;
+    if (this.beat < 1.5) return pose([LAPTOP[0] + 0.3, 0.7, 0.2], 3.5, -24, 22, 40);
+    return pose([0, Math.max(0.5, this.stackTop - 0.4), 0], 3, -16, 20, 40);
+  }
+
   /** The conversation as a stack: the starting request, then a slice per lap (reply + tool result). */
   private context(lap: number, u: number, b: number, fast: number): void {
     const x = 0;
@@ -302,6 +313,7 @@ class LoopScene implements Scene {
       slab(l.reply, C.claude, 0.9, sending);
       slab(l.result, C.tools, 0.9, sending && i < lap - 1);
     }
+    this.stackTop = y;
     const total = (LAPS[lap] as Lap).before;
     this.label("ctx", [x, y + 0.5, z], `context ≈ ${Math.round(total / 1000)}k tokens`, {
       kind: "mono",

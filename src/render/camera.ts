@@ -146,6 +146,19 @@ const wrapAngle = (a: number): number => {
   return x - Math.PI;
 };
 
+/**
+ * Zoom from pose a into close-up b (fly-throughs, story/flights.ts). Distance moves in log space with
+ * s, and everything else moves in step with how much of the distance has been covered, so the anchor
+ * holds its place on screen as the camera closes in. (Moving the target linearly in s while the
+ * distance shrinks geometrically can put the eye inside whatever it's zooming toward, such as a planet.)
+ */
+export function flyPose(a: CameraPose, b: CameraPose, s: number): CameraPose {
+  const d = Math.exp(Math.log(a.distance) + (Math.log(b.distance) - Math.log(a.distance)) * s);
+  const span = a.distance - b.distance;
+  const u = Math.abs(span) < 1e-9 * a.distance ? s : (a.distance - d) / span;
+  return { ...lerpPose(a, b, u), distance: d };
+}
+
 /** Blend two poses: positions linearly, distance in log space (so big zooms feel even), yaw the short way. */
 export function lerpPose(a: CameraPose, b: CameraPose, t: number): CameraPose {
   const yaw = a.yaw + wrapAngle(b.yaw - a.yaw) * t;

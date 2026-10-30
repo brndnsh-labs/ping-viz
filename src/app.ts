@@ -1,6 +1,6 @@
 // The frame loop: scroll → story position → scenes → camera → render, plus labels and the HUD.
 import type { Gpu } from "./gpu/context";
-import { type CameraState, cameraState, type LensShift, lerpPose } from "./render/camera";
+import { type CameraState, cameraState, flyPose, type LensShift } from "./render/camera";
 import type { PostParams } from "./render/post";
 import { type CapturedFrame, Renderer, type SlotDraw } from "./render/renderer";
 import { createScenes } from "./scenes";
@@ -348,7 +348,7 @@ export class App {
         this.warned.add(slot.fly.anchor);
         console.warn(`ping-viz: ${slot.scene} has no anchor "${slot.fly.anchor}"`);
       }
-      const shot = close && slot.fly ? lerpPose(pose, close, slot.fly.s) : pose;
+      const shot = close && slot.fly ? flyPose(pose, close, slot.fly.s) : pose;
       const cam = cameraState({ ...shot, distance: shot.distance * slot.dolly }, [this.cssW, this.cssH], mode.shift);
       cams.push(cam);
       this.labels.place(slot.scene, labels, cam, slot.weight);

@@ -486,6 +486,14 @@ class ModelScene implements Scene {
     return poseAt(f.narrow ? KEYS_NARROW : KEYS, u);
   }
 
+  anchor(name: string): CameraPose | null {
+    // Close-ups for fly-throughs (story/flights.ts): where your message's tokens enter at the foot of the
+    // layers, and where the last generated token leaves at the top.
+    if (name === "input") return pose([(MSG_X0 + X_LAST) / 2, Y_IN - 0.35, 0.3], 7, 22, 10, 38);
+    if (name === "output") return pose([genX(SEQ_B.length - 1), Y_OUT, 0.2], 2.2, 20, 8, 38);
+    return null;
+  }
+
   // ---- the lattice (the prompt's columns) --------------------------------------------------------
 
   private setLattice(

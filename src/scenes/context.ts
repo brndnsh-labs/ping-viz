@@ -314,6 +314,10 @@ class ContextScene implements Scene {
   private readonly lines: LineBatch;
   private readonly flares: PointBatch;
   private out: Label[] = [];
+  private layout: Layout = layoutFor(false);
+  private dFull = 1;
+  private tau = 0;
+  private beat = 0;
 
   constructor(gfx: Gfx) {
     this.wall = new PointBatch(gfx, "context-wall", {}, { key: "context-wall", wgsl: wallWgsl() });
@@ -356,6 +360,10 @@ class ContextScene implements Scene {
     this.wall.time = f.reducedMotion ? 0 : f.time;
 
     const cam = this.camera(b, L, f);
+    this.layout = L;
+    this.dFull = fullDistance(L, f);
+    this.tau = tau;
+    this.beat = b;
     const visH = 2 * cam.distance * TAN_HALF_FOV;
     const zoom = visH / (2 * fullDistance(L, f) * TAN_HALF_FOV);
     this.guides(b, L, f, front, frame, bpRows);
@@ -678,6 +686,23 @@ class ContextScene implements Scene {
       yaw: p.yaw + drift * 0.009 * Math.sin(f.time * 0.37),
       pitch: p.pitch + drift * 0.005 * Math.sin(f.time * 0.29 + 1),
     };
+  }
+
+  anchor(name: string): CameraPose | null {
+    // "request" serves both ends of the chapter (story/flights.ts): early on, the dim wall's foot where
+    // the request starts to build; at the end, a packet it left in (the 60th, near the nozzle).
+    if (name !== "request") return null;
+    const L = this.layout;
+    if (this.beat < 1.5) return pose([0, 0.04 * L.h, 0], this.dFull * 0.4, -14, -8, 40);
+    const nozzle = nozzleOf(L);
+    const u = Math.max(this.tau - 60 * STAG, FORM * 2);
+    return pose(
+      [nozzle[0] + Math.cos(PHI) * SPEED * u, nozzle[1], nozzle[2] - Math.sin(PHI) * SPEED * u],
+      1.5,
+      0,
+      3,
+      40,
+    );
   }
 
   draw(pass: GPURenderPassEncoder): void {

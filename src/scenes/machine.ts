@@ -1660,6 +1660,15 @@ class MachineScene implements Scene {
       const c = this.cellList.find((cell) => cell.id === "child")?.c ?? PING;
       return P(c[0], c[1], c[2], 1.5, -12, 14, 36);
     }
+    // The Enter key, up close.
+    if (name === "enter-key") return P(ENTER.c[0] + 0.1, 0.08, ENTER.c[2] + 0.05, 1.3, -24, 32, 34);
+    // The Wi-Fi antenna's upper half, where the packet leaves and the reply arrives.
+    if (name === "antenna") return P(ANTENNA[0], 0.45, ANTENNA[2], 1.8, -22, 18, 36);
+    // Claude Code's process cell, once launched.
+    if (name === "claude") {
+      const c = this.cellList.find((cell) => cell.id === "claude")?.c ?? cellCenter(U.claude as CellSpot);
+      return P(c[0], c[1], c[2], 2.5, -14, 16, 36);
+    }
     return null;
   }
 
